@@ -40,7 +40,9 @@ Then open `http://<your-server-ip>:8080` and create the administrator account.
 Options go after `bash -s --`, for example `curl -fsSL …/install.sh | sudo bash -s -- --port 9000`:
 `--port 9000` (panel port), `--no-firewall`, `--uninstall` (keeps your data), `--purge` (deletes everything).
 
-**Upgrading:** run the same one-line command again. It downloads the latest version and keeps your servers and settings.
+**Upgrading:** open **Settings → Updates** and click **Update now** (an "Update available" badge appears in the sidebar when GitHub has a newer version). Servers that were running are stopped safely and started again afterwards. Running the one-line install command again does the same thing.
+
+Installs made before v1.1.0 don't have the updater yet: run the install command once more and the button works from then on.
 
 ### On Proxmox
 
@@ -74,6 +76,8 @@ Open **Network**, enter your domain (e.g. `play.example.com`) and click **Enable
 | Fabric | installs **FabricProxy-Lite** (and Fabric API) and writes its secret |
 | Forge / NeoForge | installs **Proxy-Compatible-Forge** and writes its secret |
 
+Settings are applied the moment a server joins or leaves the network (or you enable/disable it), not just on its next start. Running servers with nobody online restart automatically; busy ones show **Restart needed**, and the proxy won't send players to them until they've restarted with the right settings.
+
 Backend servers listen on `127.0.0.1` only, so nobody can bypass the proxy. Vanilla and custom jars can't do Velocity forwarding; they keep their own public port.
 
 **DNS:** create an `A` record for `play.example.com` pointing at your public IP, and a wildcard `A` record `*.play.example.com` if you want per-server addresses. On Cloudflare use "DNS only" (grey cloud). Forward TCP 25565 on your router to the machine. The Network page shows the exact records to create.
@@ -103,7 +107,8 @@ Backend servers listen on `127.0.0.1` only, so nobody can bypass the proxy. Vani
 ```
 /opt/craftpanel/app         panel code
 /opt/craftpanel/node        bundled Node.js
-/etc/craftpanel.env         CP_PORT, CP_HOST, CP_DATA_DIR
+/etc/craftpanel.env         CP_PORT, CP_HOST, CP_DATA_DIR, CP_REPO, CP_BRANCH
+/etc/systemd/system/craftpanel-update.{path,service}   one-click updater (runs install.sh as root)
 /var/lib/craftpanel/
   db.json                   panel settings, users, server list
   servers/<id>/             each server's files
