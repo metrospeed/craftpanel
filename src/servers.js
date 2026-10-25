@@ -168,10 +168,19 @@ class ServerManager extends EventEmitter {
       createdAt: new Date().toISOString(),
     };
     fs.mkdirSync(this.dir(id), { recursive: true });
+    if (opts.world && !provider.proxy) {
+      try {
+        require('./worlds').place(opts.world, this.dir(id), provider.id);
+      } catch (err) {
+        fs.rmSync(this.dir(id), { recursive: true, force: true });
+        throw err;
+      }
+    }
     store.db.servers.push(server);
     store.save();
     this.emit('changed');
 
+    if (opts.world) this.log(id, 'Imported the uploaded world.');
     this.install(id, { eula: !!opts.eula }).catch(() => {});
     return server;
   }

@@ -1,5 +1,5 @@
 import { api } from '../api.js';
-import { html, mount, icon, typeIcon, $, $$, toastError, toast } from '../ui.js';
+import { html, mount, icon, typeIcon, bytes, $, $$, toastError, toast } from '../ui.js';
 import { state, loadTypes, refreshServers } from '../state.js';
 
 const GROUPS = [
@@ -28,6 +28,7 @@ export default async function create(page) {
     eula: false,
     port: '',
     unstable: false,
+    world: null, // { files, label, size } of an uploaded archive or folder
   };
   let versions = [];
   let loaders = [];
@@ -145,6 +146,25 @@ export default async function create(page) {
                         </div>
                       </label>`
                     : html`<div class="callout full">${t.name} servers cannot sit behind the Velocity proxy, so this one gets its own public port.</div>`}
+                  <div class="field full">
+                    <span style="font-size:12.5px;font-weight:600;color:var(--text-2)">World</span>
+                    ${form.world
+                      ? html`<div class="callout ok row">
+                          ${icon('globe')}<b class="grow">${form.world.label}</b>
+                          <span class="faint small">${bytes(form.world.size)}</span>
+                          <button type="button" class="btn sm ghost" id="world-clear">${icon('x')}Remove</button>
+                        </div>`
+                      : html`<div class="row wrap">
+                          <button type="button" class="btn sm" id="world-archive">${icon('upload')}Upload .zip / .tar.gz</button>
+                          <button type="button" class="btn sm" id="world-folder">${icon('folder')}Choose world folder</button>
+                        </div>`}
+                    <input type="file" id="world-archive-input" accept=".zip,.tar.gz,.tgz,.tar" class="hidden" />
+                    <input type="file" id="world-folder-input" webkitdirectory class="hidden" />
+                    <span class="hint">
+                      Optional. Leave empty to generate a new world, or upload one from your singleplayer saves or another server
+                      (the folder with <code>level.dat</code> in it, or a zip of it).
+                    </span>
+                  </div>
                   <label class="field">
                     <span>Port</span>
                     <input type="number" name="port" value="${form.port}" placeholder="Automatic" min="1024" max="65535" />
@@ -233,27 +253,54 @@ export default async function create(page) {
     f.autostart.onchange = () => (form.autostart = f.autostart.checked);
     f.eula.onchange = () => (form.eula = f.eula.checked);
     f.port.oninput = () => (form.port = f.port.value);
+    const pickWorld = (files, label) => {
+      if (!files.length) return;
+      form.world = { files, label, size: files.reduce((n, x) => n + x.size, 0) };
+      render();
+    };
+    const archiveInput = $('#world-archive-input', f);
+    const folderInput = $('#world-folder-input', f);
+    archiveInput.onchange = () => pickWorld([...archiveInput.files], archiveInput.files[0]?.name);
+    folderInput.onchange = () => pickWorld([...folderInput.files], folderInput.files[0]?.webkitRelativePath.split('/')[0]);
+    if ($('#world-archive', f)) $('#world-archive', f).onclick = () => archiveInput.click();
+    if ($('#world-folder', f)) $('#world-folder', f).onclick = () => folderInput.click();
+    if ($('#world-clear', f)) {
+      $('#world-clear', f).onclick = () => {
+        form.world = null;
+        render();
+      };
+    }
     f.onsubmit = async (e) => {
       e.preventDefault();
       const btn = $('button[type=submit]', f);
+      const label = btn.innerHTML;
       btn.disabled = true;
+      const body = {
+        name: form.name,
+        type: form.type,
+        mcVersion: form.mcVersion,
+        loaderVersion: form.loaderVersion || null,
+        memoryMb: form.memoryMb,
+        port: form.port ? Number(form.port) : undefined,
+        network: typeInfo().network ? form.network : false,
+        autostart: form.autostart,
+        eula: form.eula,
+      };
       try {
-        const server = await api.post('/api/servers', {
-          name: form.name,
-          type: form.type,
-          mcVersion: form.mcVersion,
-          loaderVersion: form.loaderVersion || null,
-          memoryMb: form.memoryMb,
-          port: form.port ? Number(form.port) : undefined,
-          network: typeInfo().network ? form.network : false,
-          autostart: form.autostart,
-          eula: form.eula,
-        });
+        const server = form.world
+          ? await api.upload(
+              '/api/servers',
+              form.world.files,
+              (p) => (btn.textContent = p < 1 ? `Uploading world… ${Math.round(p * 100)}%` : 'Importing world…'),
+              { data: JSON.stringify(body) },
+            )
+          : await api.post('/api/servers', body);
         toast(`${server.name} created, installing now`);
         await refreshServers();
         location.hash = `#/server/${server.id}/console`;
       } catch (err) {
         toastError(err);
+        btn.innerHTML = label;
         btn.disabled = false;
       }
     };
