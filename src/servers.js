@@ -466,7 +466,9 @@ class ServerManager extends EventEmitter {
   }
 
   async autostart() {
-    const list = store.db.servers.filter((s) => s.autostart && s.installState === 'installed');
+    const list = store.db.servers.filter(
+      (s) => s.autostart && s.installState === 'installed' && (!s.isProxy || store.db.network.enabled),
+    );
     // Backends first so the proxy can reach them when it comes up.
     for (const s of list.sort((a, b) => Number(a.isProxy) - Number(b.isProxy))) {
       try {

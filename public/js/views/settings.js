@@ -143,7 +143,7 @@ export default async function settings(page) {
           <h3>Updates</h3>
           ${u.updateAvailable ? html`<span class="badge running">Update available</span>` : u.error ? '' : html`<span class="badge">Up to date</span>`}
           <button class="btn sm" id="update-check">${icon('refresh')}Check now</button>
-          ${u.updateAvailable ? html`<button class="btn sm primary" id="update-go" ${u.pending ? 'disabled' : ''}>${icon('download')}${u.pending ? 'Update starting…' : 'Update now'}</button>` : ''}
+          ${u.updateAvailable && u.canSelfUpdate ? html`<button class="btn sm primary" id="update-go" ${u.pending ? 'disabled' : ''}>${icon('download')}${u.pending ? 'Update starting…' : 'Update now'}</button>` : ''}
         </div>
         <div class="card-body stack tight">
           <div class="muted small">
