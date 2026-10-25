@@ -42,9 +42,29 @@ function ready(s) {
   return !servers.isRunning(s.id) || !servers.needsRestart(s);
 }
 
+/**
+ * The name each server has in Velocity (`/server <name>`, <name>.domain),
+ * taken from its current display name so renames carry over. Duplicates get
+ * a number; "try" is reserved by velocity.toml.
+ */
+function proxyNames() {
+  const names = new Map();
+  const taken = new Set(['try']);
+  for (const s of store.db.servers.filter((x) => !x.isProxy)) {
+    const base = servers.slugify(s.name) || s.id;
+    let name = base;
+    for (let n = 2; taken.has(name); n++) name = `${base}-${n}`;
+    taken.add(name);
+    names.set(s.id, name);
+  }
+  return names;
+}
+
+const proxyName = (s) => proxyNames().get(s.id) || s.id;
+
 function hostnameFor(s) {
   if (s.hostname) return s.hostname;
-  return settings().domain ? `${s.id}.${settings().domain}` : null;
+  return settings().domain ? `${proxyName(s)}.${settings().domain}` : null;
 }
 
 function lobbyId() {
@@ -108,6 +128,7 @@ function status() {
         joined: inNetwork(s),
         network: !!s.network,
         hostname: hostnameFor(s),
+        proxyName: proxyName(s),
         customHostname: s.hostname || '',
         status: servers.view(s).status,
         restartPending: servers.needsRestart(s),
@@ -262,14 +283,15 @@ async function configureProxy() {
   cfg['player-info-forwarding-mode'] = 'MODERN';
   cfg['forwarding-secret-file'] = 'forwarding.secret';
   cfg['announce-forge'] = list.some((s) => s.type === 'forge' || s.type === 'neoforge');
+  const names = proxyNames();
   cfg.servers = {};
-  for (const s of list) cfg.servers[s.id] = `127.0.0.1:${s.port}`;
-  cfg.servers.try = lobby ? [lobby, ...list.filter((s) => s.id !== lobby).map((s) => s.id)] : [];
+  for (const s of list) cfg.servers[names.get(s.id)] = `127.0.0.1:${s.port}`;
+  cfg.servers.try = lobby ? [lobby, ...list.filter((s) => s.id !== lobby).map((s) => s.id)].map((id) => names.get(id)) : [];
   cfg['forced-hosts'] = {};
   if (n.forcedHosts) {
     for (const s of list) {
       const host = hostnameFor(s);
-      if (host) cfg['forced-hosts'][host] = [s.id];
+      if (host) cfg['forced-hosts'][host] = [names.get(s.id)];
     }
   }
   const secretChanged = writeIfChanged(path.join(dir, 'forwarding.secret'), n.secret);

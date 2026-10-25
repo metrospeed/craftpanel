@@ -1,8 +1,7 @@
 import { api } from '../api.js';
 import { html, mount, icon, statusBadge, typeIcon, $, $$, toast, toastError, confirmDialog, copyText } from '../ui.js';
 import { refreshServers, typeName } from '../state.js';
-import { motdEditor } from '../motd.js';
-import { mountIconField, iconUrl } from '../server-icon.js';
+import { serverListCard } from '../motd.js';
 
 export default async function network(page) {
   let net = null;
@@ -93,11 +92,9 @@ export default async function network(page) {
                 <input type="number" name="proxyPort" value="${net.proxyPort}" min="1" max="65535" />
               </label>
             </div>
-            ${net.proxy ? html`<div class="field"><span>Server list icon</span><div id="icon-field"></div></div>` : ''}
             <div class="field">
-              <span>Server list MOTD</span>
-              <div id="motd-editor"></div>
-              <input type="hidden" name="motd" value="${net.motd}" />
+              <span>Server list</span>
+              <div id="server-list-card"></div>
             </div>
             <div class="form-grid">
               <label class="field"><span>Max players shown</span><input type="number" name="maxPlayers" value="${net.maxPlayers}" min="1" /></label>
@@ -118,7 +115,7 @@ export default async function network(page) {
               <tbody>
                 ${net.servers.map(
                   (s) => html`<tr>
-                    <td><div class="row">${typeIcon(s.type, 28)}<div><a href="#/server/${s.id}"><b>${s.name}</b></a><div class="faint small">${typeName(s.type)}${s.id === net.lobby ? ' · lobby' : ''}</div></div></div></td>
+                    <td><div class="row">${typeIcon(s.type, 28)}<div><a href="#/server/${s.id}"><b>${s.name}</b></a><div class="faint small">${typeName(s.type)}${s.id === net.lobby ? ' · lobby' : ''}${s.joined ? html` · <code>/server ${s.proxyName}</code>` : ''}</div></div></div></td>
                     <td>
                       ${s.capable
                         ? html`<label class="switch"><input type="checkbox" data-join="${s.id}" ${s.network ? 'checked' : ''} /><span></span></label>`
@@ -249,18 +246,18 @@ export default async function network(page) {
       };
     });
     const f = $('#net-form', page);
-    const motd = motdEditor($('#motd-editor', page), {
-      value: net.motd,
+    serverListCard($('#server-list-card', page), {
+      serverId: net.proxy?.id || null,
       format: 'minimessage',
+      value: net.motd,
       name: net.domain || 'CraftPanel Network',
       players: `0/${net.maxPlayers}`,
-      icon: net.proxy ? iconUrl(net.proxy.id) : '',
       fallbackIcon: '/img/types/velocity.svg',
-      onChange: (v) => (f.motd.value = v),
+      save: async (motd) => {
+        net.motd = (await api.put('/api/network', { motd })).motd;
+        toast('MOTD saved and applied to the proxy');
+      },
     });
-    if (net.proxy) {
-      mountIconField($('#icon-field', page), net.proxy.id, { fallback: '/img/types/velocity.svg', onChange: (url) => motd.setIcon(url) });
-    }
     savedForm = formState();
     f.onsubmit = async (e) => {
       e.preventDefault();
@@ -269,7 +266,6 @@ export default async function network(page) {
           domain: f.domain.value,
           lobby: f.lobby.value || null,
           proxyPort: Number(f.proxyPort.value),
-          motd: f.motd.value,
           maxPlayers: Number(f.maxPlayers.value),
           forcedHosts: f.forcedHosts.checked,
         });

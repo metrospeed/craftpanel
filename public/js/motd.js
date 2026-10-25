@@ -5,7 +5,8 @@
 //  - 'legacy': server.properties. Colour codes are stored as §x but shown and
 //    typed as &x, which is easier to type.
 //  - 'minimessage': the Velocity proxy (<red>, <bold>, <#ff8800>, <gradient:...>).
-import { html, mount, $, $$ } from './ui.js';
+import { html, mount, modal, icon as uiIcon, $, $$ } from './ui.js';
+import { mountIconField, iconUrl } from './server-icon.js';
 
 const COLORS = [
   ['0', 'black', '#000000'],
@@ -198,6 +199,46 @@ function renderLine(chars) {
   });
 }
 
+// Server-list preview (icon, name, players, two MOTD lines) -------------------
+
+function previewHtml({ name, players, icon, fallbackIcon }) {
+  return html`<div class="motd-preview">
+    <img class="motd-icon" alt="" src="${icon || fallbackIcon}" />
+    <div class="motd-body">
+      <div class="motd-head"><span class="motd-name">${name}</span><span class="motd-players">${players}</span></div>
+      <div class="motd-lines"></div>
+    </div>
+  </div>`;
+}
+
+/** Wire up a preview rendered by previewHtml inside `el`. */
+function bindPreview(el, { fallbackIcon }) {
+  const lines = $('.motd-lines', el);
+  const img = $('.motd-icon', el);
+  img.onerror = () => {
+    if (fallbackIcon && !img.src.endsWith(fallbackIcon)) img.src = fallbackIcon;
+  };
+  // Scrambled text keeps changing, like in the game.
+  const timer = setInterval(() => {
+    if (!el.isConnected) return clearInterval(timer);
+    $$('.obf', lines).forEach((span) => {
+      span.textContent = [...span.textContent].map((ch) => (ch === ' ' ? ch : OBF_CHARS[Math.floor(Math.random() * OBF_CHARS.length)])).join('');
+    });
+  }, 80);
+  return {
+    /** Show `chars` (from a parser) and return them split into lines. */
+    show(chars) {
+      const rows = [[]];
+      for (const c of chars) c.ch === '\n' ? rows.push([]) : rows[rows.length - 1].push(c);
+      mount(lines, html`${rows.slice(0, 2).map((r) => html`<div class="motd-line">${renderLine(r)}${r.length ? '' : ' '}</div>`)}`);
+      return rows;
+    },
+    setIcon(url) {
+      img.src = url;
+    },
+  };
+}
+
 /**
  * Mount a MOTD editor in `el`. `value` is the stored MOTD; `onChange(value)`
  * receives the stored form after every edit. `name`, `players` and `icon`
@@ -232,35 +273,21 @@ export function motdEditor(el, { value = '', format = 'legacy', name = 'Minecraf
           <button type="button" class="btn sm" data-center title="Pad each line with spaces so it sits in the middle">Centre</button>
         </div>
         <textarea rows="${mini ? 3 : 2}" spellcheck="false" data-raw></textarea>
-        <div class="motd-preview">
-          <img class="motd-icon" alt="" src="${icon || fallbackIcon}" />
-          <div class="motd-body">
-            <div class="motd-head"><span class="motd-name">${name}</span><span class="motd-players">${players}</span></div>
-            <div class="motd-lines"></div>
-          </div>
-        </div>
+        ${previewHtml({ name, players, icon, fallbackIcon })}
         <span class="hint" data-hint></span>
       </div>
     `,
   );
   const ta = $('[data-raw]', el);
-  const lines = $('.motd-lines', el);
   const hint = $('[data-hint]', el);
-  const img = $('.motd-icon', el);
-  img.onerror = () => {
-    img.onerror = null;
-    if (fallbackIcon) img.src = fallbackIcon;
-  };
+  const preview = bindPreview(el, { fallbackIcon });
   ta.value = fmt.fromValue(value);
 
   const baseHint = mini
     ? 'Select text and click a colour or effect to wrap it, e.g. <gold>My <bold>Network</bold></gold>.'
     : 'Select text and click a colour or effect, or type & codes (e.g. &6&lGold bold). Pick the colour first: a colour code clears effects before it.';
   function update() {
-    const chars = fmt.parse(ta.value);
-    const rows = [[]];
-    for (const c of chars) c.ch === '\n' ? rows.push([]) : rows[rows.length - 1].push(c);
-    mount(lines, html`${rows.slice(0, 2).map((r) => html`<div class="motd-line">${renderLine(r)}${r.length ? '' : ' '}</div>`)}`);
+    const rows = preview.show(fmt.parse(ta.value));
     const tooWide = rows.some((r) => lineWidth(r) > MAX_WIDTH);
     hint.textContent =
       rows.length > 2
@@ -304,21 +331,73 @@ export function motdEditor(el, { value = '', format = 'legacy', name = 'Minecraf
   };
   ta.oninput = update;
 
-  // Scrambled text keeps changing, like in the game.
-  const timer = setInterval(() => {
-    if (!el.isConnected) return clearInterval(timer);
-    $$('.obf', lines).forEach((span) => {
-      span.textContent = [...span.textContent].map((ch) => (ch === ' ' ? ch : OBF_CHARS[Math.floor(Math.random() * OBF_CHARS.length)])).join('');
-    });
-  }, 80);
-
   update();
   return {
     get value() {
       return fmt.toValue(ta.value);
     },
-    setIcon(url) {
-      img.src = url;
-    },
+    setIcon: preview.setIcon,
+  };
+}
+
+/**
+ * A compact server-list preview with an "Edit icon & MOTD" button that opens
+ * the icon upload and MOTD editor in a popup. `save(motd)` stores the MOTD.
+ * Without `serverId` there is no icon to change, only the MOTD.
+ */
+export function serverListCard(el, { serverId = null, format = 'legacy', value = '', name, players, fallbackIcon = '', iconNote = '', save }) {
+  const fmt = FORMATS[format];
+  const icon = serverId ? iconUrl(serverId) : '';
+  mount(
+    el,
+    html`<div class="server-list-card">
+      ${previewHtml({ name, players, icon, fallbackIcon })}
+      <button type="button" class="btn sm" data-edit-list>${uiIcon('edit')}${serverId ? 'Edit icon & MOTD' : 'Edit MOTD'}</button>
+    </div>`,
+  );
+  const preview = bindPreview(el, { fallbackIcon });
+  preview.show(fmt.parse(fmt.fromValue(value)));
+
+  $('[data-edit-list]', el).onclick = () => {
+    let editor;
+    modal({
+      title: serverId ? 'Server list icon & MOTD' : 'Server list MOTD',
+      wide: true,
+      body: (body) => {
+        mount(
+          body,
+          html`<div class="stack">
+            ${serverId ? html`<div class="field"><span>Server icon</span><div data-icon-field></div></div>` : ''}
+            <div class="field"><span>Message of the day</span><div data-motd-editor></div></div>
+          </div>`,
+        );
+        editor = motdEditor($('[data-motd-editor]', body), { value, format, name, players, icon: serverId ? iconUrl(serverId) : '', fallbackIcon });
+        if (serverId) {
+          mountIconField($('[data-icon-field]', body), serverId, {
+            fallback: fallbackIcon,
+            note: iconNote,
+            onChange: (url) => {
+              editor.setIcon(url);
+              preview.setIcon(url);
+            },
+          });
+        }
+      },
+      actions: [
+        { label: 'Cancel' },
+        {
+          label: 'Save MOTD',
+          cls: 'primary',
+          onClick: async () => {
+            const next = editor.value;
+            if (next !== value) {
+              await save(next);
+              value = next;
+              preview.show(fmt.parse(fmt.fromValue(value)));
+            }
+          },
+        },
+      ],
+    });
   };
 }
