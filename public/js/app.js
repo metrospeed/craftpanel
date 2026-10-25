@@ -7,6 +7,7 @@ import server from './views/server.js';
 import network from './views/network.js';
 import users from './views/users.js';
 import settings from './views/settings.js';
+import { checkForUpdates } from './update.js';
 
 const app = document.getElementById('app');
 
@@ -80,6 +81,9 @@ function renderSidebar() {
     side,
     html`
       <div class="brand"><img src="/favicon.svg" alt="" />CraftPanel<small>v${state.version}</small></div>
+      ${state.update?.updateAvailable
+        ? html`<a class="update-pill" href="#/settings">${icon('arrowUp')}Update available${state.update.latestVersion && state.update.latestVersion !== state.version ? html` · v${state.update.latestVersion}` : ''}</a>`
+        : ''}
       <nav class="nav">
         ${link('', 'dashboard', 'Dashboard')} ${state.user.admin ? link('network', 'network', 'Network') : ''}
         ${state.user.admin ? link('users', 'users', 'Users') : ''} ${link('settings', 'settings', 'Settings')}
@@ -174,6 +178,7 @@ async function startApp() {
   await Promise.all([refreshServers(), loadTypes()]);
   if (!location.hash) location.hash = '#/';
   route();
+  checkForUpdates();
 }
 
 window.addEventListener('hashchange', route);

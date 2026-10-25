@@ -89,7 +89,15 @@ class ServerManager extends EventEmitter {
       networkCapable: !!providers.get(s.type).network,
       joinedNetwork: require('./network').inNetwork(s),
       networkHost: require('./network').hostnameFor(s),
+      restartPending: this.needsRestart(s),
     };
+  }
+
+  /** Running with settings that no longer match the network config (joined/left, new secret, new port). */
+  needsRestart(s) {
+    const r = this.rt(s.id);
+    if (!r.child || s.isProxy || s.type === 'custom') return false;
+    return r.appliedKey !== require('./network').configKey(s);
   }
 
   isRunning(id) {
@@ -211,7 +219,7 @@ class ServerManager extends EventEmitter {
     this.setStatus(id, 'stopped');
     this.emit('changed');
     if (server.installState === 'installed') {
-      require('./network').onServersChanged().catch(() => {});
+      require('./network').syncBackends().catch(() => {});
       // A freshly created network proxy should come up without an extra click.
       if (server.isProxy && server.autostart && store.db.network.enabled && !this.isRunning(id)) {
         this.start(id).catch((e) => log(`Autostart failed: ${e.message}`));
@@ -261,6 +269,8 @@ class ServerManager extends EventEmitter {
     try {
       const network = require('./network');
       await network.applyConfig(server, log);
+      r.appliedKey = network.configKey(server);
+      if (network.inNetwork(server)) log(`Network: listening on 127.0.0.1:${server.port} behind the Velocity proxy.`);
       env = { ...process.env, ...network.env(server) };
       javaBin = await this.javaFor(server, log);
     } catch (err) {
@@ -276,6 +286,8 @@ class ServerManager extends EventEmitter {
     r.stopping = false;
     r.startedAt = Date.now();
     r.players = null;
+    // The proxy only routes to backends started with the current network settings.
+    if (!server.isProxy) require('./network').onServersChanged().catch(() => {});
 
     let buf = '';
     const onData = (chunk) => {
@@ -410,7 +422,7 @@ class ServerManager extends EventEmitter {
     if (server.isProxy && 'port' in patch) store.db.network.proxyPort = server.port;
     store.save();
     this.emit('changed');
-    require('./network').onServersChanged().catch(() => {});
+    require('./network').syncBackends().catch(() => {});
     return server;
   }
 

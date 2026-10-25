@@ -1,6 +1,7 @@
 import { api } from '../api.js';
-import { html, mount, icon, bytes, duration, $, $$, toast, toastError, confirmDialog } from '../ui.js';
-import { state } from '../state.js';
+import { html, mount, icon, bytes, duration, ago, $, $$, toast, toastError, confirmDialog } from '../ui.js';
+import { state, onState } from '../state.js';
+import { checkForUpdates, startUpdate } from '../update.js';
 
 export default async function settings(page) {
   let sys = null;
@@ -21,6 +22,7 @@ export default async function settings(page) {
       page,
       html`
         <div class="page-head"><div class="grow"><h1>Settings</h1><div class="sub">CraftPanel ${sys.version}</div></div></div>
+        ${admin ? updatesCard() : ''}
         <div class="grid cols-2" style="align-items:start">
           <form class="card card-body stack" id="pw">
             <h3>Change password</h3>
@@ -88,6 +90,16 @@ export default async function settings(page) {
       `,
     );
 
+    const check = $('#update-check', page);
+    if (check)
+      check.onclick = async () => {
+        check.disabled = true;
+        await checkForUpdates(true);
+        render();
+      };
+    const go = $('#update-go', page);
+    if (go) go.onclick = () => startUpdate();
+
     $('#pw', page).onsubmit = async (e) => {
       e.preventDefault();
       const f = e.target;
@@ -121,5 +133,50 @@ export default async function settings(page) {
     });
   }
 
+  function updatesCard() {
+    const u = state.update;
+    if (!u) return html`<div class="card card-body" style="margin-bottom:16px"><span class="spinner"></span> Checking GitHub for updates…</div>`;
+    const current = `v${u.currentVersion}${u.currentCommit ? ` (${u.currentCommit})` : ''}`;
+    return html`
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-head">
+          <h3>Updates</h3>
+          ${u.updateAvailable ? html`<span class="badge running">Update available</span>` : u.error ? '' : html`<span class="badge">Up to date</span>`}
+          <button class="btn sm" id="update-check">${icon('refresh')}Check now</button>
+          ${u.updateAvailable ? html`<button class="btn sm primary" id="update-go" ${u.pending ? 'disabled' : ''}>${icon('download')}${u.pending ? 'Update starting…' : 'Update now'}</button>` : ''}
+        </div>
+        <div class="card-body stack tight">
+          <div class="muted small">
+            Installed ${current} · latest on GitHub
+            ${u.latestCommit ? html`<b>${u.latestVersion ? `v${u.latestVersion} ` : ''}(${u.latestCommit})</b>` : 'unknown'}
+            · <a href="https://github.com/${u.repo}/commits/${u.branch}" target="_blank" rel="noopener">${u.repo}</a>
+            ${u.checkedAt ? html` · checked ${ago(u.checkedAt)}` : ''}
+          </div>
+          ${u.error ? html`<div class="callout warn">${u.error}</div>` : ''}
+          ${u.updateAvailable && u.changes.length
+            ? html`<div class="small"><b>What's new</b>
+                <ul style="margin:6px 0 0;padding-left:18px;line-height:1.7">
+                  ${u.changes.map((c) => html`<li><code>${c.sha}</code> ${c.message}</li>`)}
+                </ul></div>`
+            : ''}
+          ${u.updateAvailable && !u.canSelfUpdate
+            ? html`<div class="callout info">One-click updates need the updater that newer installers add. Run this on the server once, after that the button works:
+                <div class="mono" style="margin-top:6px;user-select:all">curl -fsSL https://raw.githubusercontent.com/${u.repo}/${u.branch}/install.sh | sudo bash</div></div>`
+            : ''}
+          ${u.lastLog ? html`<details class="small"><summary class="muted">Last update log (${ago(u.lastLog.at)})</summary><pre class="mono" style="white-space:pre-wrap;margin:8px 0 0">${u.lastLog.tail}</pre></details>` : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  // Re-render only when the update check result changes (onState also fires for live stats).
+  let lastUpdate = state.update;
+  const unsub = onState(() => {
+    if (!sys || state.update === lastUpdate) return;
+    lastUpdate = state.update;
+    if (!page.contains(document.activeElement)) render();
+  });
+  if (state.user.admin && !state.update) checkForUpdates();
   await load();
+  return unsub;
 }

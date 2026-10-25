@@ -70,6 +70,12 @@ export default async function server(page, id, tab = 'console') {
         ${st === 'installing' ? html`<button class="btn" disabled><span class="spinner"></span>Installing…</button>` : ''}
         ${st === 'install_failed' ? html`<a class="btn" href="#/server/${id}/settings">Reinstall…</a>` : ''}
       </div>
+      ${s.restartPending
+        ? html`<div class="callout warn row" style="flex-basis:100%">
+            <span class="grow">Network settings changed while players were online. Restart this server to ${s.joinedNetwork ? 'join the network' : 'apply them'}; until then the proxy won't send players here.</span>
+            <button class="btn sm" data-act="restart">${icon('restart')}Restart now</button>
+          </div>`
+        : ''}
     `);
     if (out === lastHead) return;
     lastHead = out;

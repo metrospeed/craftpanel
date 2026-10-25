@@ -30,6 +30,7 @@ app.get('/api/auth/state', (req, res) => {
     setupRequired: store.db.users.length === 0,
     user: auth.publicUser(auth.userFromRequest(req)),
     version: config.version,
+    build: require('./updater').installedCommit()?.slice(0, 7) || null,
   });
 });
 
@@ -150,7 +151,20 @@ server.listen(config.port, config.host, () => {
   if (!store.db.users.length) console.log('Open the panel in your browser to create the admin account.');
   servers.startStatsLoop();
   backups.startScheduler();
-  servers.autostart();
+  // Autostart applies network settings per server; sync the rest (stopped ones, proxy list) afterwards.
+  const updater = require('./updater');
+  const resume = updater.takeResumeList();
+  servers
+    .autostart()
+    .then(async () => {
+      // Bring back servers that were running before a one-click update.
+      for (const id of resume) {
+        if (servers.find(id) && !servers.isRunning(id)) await servers.start(id).catch((e) => servers.log(id, `Restart after update failed: ${e.message}`));
+      }
+      await require('./network').syncBackends();
+    })
+    .catch((e) => console.error(e));
+  updater.startBackgroundChecks();
 });
 
 let shuttingDown = false;

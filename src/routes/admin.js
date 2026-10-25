@@ -4,6 +4,7 @@ const store = require('../store');
 const config = require('../config');
 const network = require('../network');
 const java = require('../java');
+const updater = require('../updater');
 const servers = require('../servers');
 const procstats = require('../util/procstats');
 const { dirSize } = require('../util/fsutil');
@@ -96,6 +97,11 @@ router.put('/settings', requireAdmin, (req, res) => {
   store.save();
   res.json(store.db.settings);
 });
+
+// Updates ------------------------------------------------------------------
+
+router.get('/update', requireAdmin, ah(async (req, res) => res.json(await updater.check({ force: req.query.force === '1' }))));
+router.post('/update', requireAdmin, (req, res) => res.json(updater.requestUpdate(servers)));
 
 router.delete('/java/:major', requireAdmin, (req, res) => {
   java.removeRuntime(req.params.major);

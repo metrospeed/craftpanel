@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Isometric grass block -->
+  <path d="M32 4 58 18 32 32 6 18z" fill="#6cc04a"/>
+  <path d="M32 4 58 18 52 21 32 10 12 21 6 18z" fill="#82d65c"/>
+  <path d="M6 18 32 32v28L6 46z" fill="#8a5a36"/>
+  <path d="M58 18 32 32v28l26-14z" fill="#6e4528"/>
+  <path d="M6 18 32 32v7L6 25z" fill="#5aa83c"/>
+  <path d="M58 18 32 32v7l26-14z" fill="#4a8f30"/>
+  <path d="M10 30h4v4h-4zM18 38h4v4h-4zM12 42h3v3h-3zM24 44h3v3h-3z" fill="#a8744a"/>
+  <path d="M40 40h4v4h-4zM48 34h3v3h-3zM44 48h4v4h-4zM52 42h3v3h-3z" fill="#5a3820"/>
+</svg>
