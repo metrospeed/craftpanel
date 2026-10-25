@@ -25,9 +25,10 @@ export const api = {
   put: (url, body) => request('PUT', url, body ?? {}),
   patch: (url, body) => request('PATCH', url, body ?? {}),
   del: (url) => request('DELETE', url),
-  upload: (url, files, onProgress) =>
+  upload: (url, files, onProgress, fields = {}) =>
     new Promise((resolve, reject) => {
       const form = new FormData();
+      for (const [k, v] of Object.entries(fields)) form.append(k, v);
       for (const f of files) form.append('files', f, f.relativePath || f.webkitRelativePath || f.name);
       const xhr = new XMLHttpRequest();
       xhr.open('POST', url);

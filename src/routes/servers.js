@@ -1,10 +1,12 @@
 const express = require('express');
+const fs = require('fs');
 const path = require('path');
 const servers = require('../servers');
 const providers = require('../providers');
 const props = require('../util/properties');
+const worlds = require('../worlds');
 const { requireAdmin, requireServerAccess, canAccess } = require('../auth');
-const { ah } = require('./util');
+const { ah, folderUpload } = require('./util');
 
 const router = express.Router();
 
@@ -33,23 +35,35 @@ router.get('/servers', (req, res) => {
   res.json(servers.all().filter((s) => canAccess(req.user, s.id)).map((s) => servers.view(s)));
 });
 
+// JSON, or multipart with the settings as a JSON `data` field plus an
+// existing world in `files` (one archive, or the files of a folder).
 router.post(
   '/servers',
   requireAdmin,
+  folderUpload.array('files'),
   ah(async (req, res) => {
-    const b = req.body || {};
-    const server = await servers.create({
-      name: b.name,
-      type: b.type,
-      mcVersion: b.mcVersion,
-      loaderVersion: b.loaderVersion,
-      memoryMb: b.memoryMb,
-      port: b.port,
-      network: b.network,
-      autostart: b.autostart,
-      eula: b.eula,
-    });
-    res.status(201).json(servers.view(server));
+    const files = req.files || [];
+    let world = null;
+    try {
+      const b = req.is('multipart/form-data') ? JSON.parse(req.body?.data || '{}') : req.body || {};
+      if (files.length) world = await worlds.prepare(files);
+      const server = await servers.create({
+        name: b.name,
+        type: b.type,
+        mcVersion: b.mcVersion,
+        loaderVersion: b.loaderVersion,
+        memoryMb: b.memoryMb,
+        port: b.port,
+        network: b.network,
+        autostart: b.autostart,
+        eula: b.eula,
+        world,
+      });
+      res.status(201).json(servers.view(server));
+    } finally {
+      worlds.cleanup(world);
+      for (const f of files) fs.rmSync(f.path, { force: true });
+    }
   }),
 );
 
