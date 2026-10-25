@@ -93,21 +93,25 @@ export function statusBadge(status) {
   return html`<span class="badge ${status}"><span class="dot ${status}"></span>${STATUS_LABEL[status] || status}</span>`;
 }
 
-export const TYPE_STYLE = {
-  paper: ['P', '#3b82f6'],
-  purpur: ['Pu', '#9b59d0'],
-  folia: ['Fo', '#22a06b'],
-  fabric: ['Fa', '#c2a878'],
-  forge: ['Fg', '#d0632f'],
-  neoforge: ['N', '#e8892b'],
-  vanilla: ['V', '#5a8f3d'],
-  velocity: ['Ve', '#0ea5c6'],
-  custom: ['C', '#64748b'],
+// Project logos in public/img/types. Pixel-art ones are scaled without smoothing.
+const TYPE_ICONS = {
+  paper: 'paper.svg',
+  purpur: 'purpur.svg',
+  folia: 'folia.png',
+  fabric: 'fabric.png',
+  forge: 'forge.svg',
+  neoforge: 'neoforge.png',
+  vanilla: 'vanilla.svg',
+  velocity: 'velocity.svg',
+  custom: 'custom.svg',
 };
+const PIXEL_ART = new Set(['fabric', 'neoforge']);
 
 export function typeIcon(type, size = 36) {
-  const [label, color] = TYPE_STYLE[type] || ['?', '#555'];
-  return html`<span class="type-icon" style="background:${color};width:${size}px;height:${size}px;font-size:${Math.round(size / 2.8)}px">${label}</span>`;
+  const file = TYPE_ICONS[type] || TYPE_ICONS.custom;
+  return html`<span class="type-icon" style="width:${size}px;height:${size}px"
+    ><img src="/img/types/${file}" alt="${type}" class="${PIXEL_ART.has(type) ? 'pixel' : ''}" draggable="false"
+  /></span>`;
 }
 
 // ANSI → HTML for console output (SGR colours incl. 256/truecolor).

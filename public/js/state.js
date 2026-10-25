@@ -6,6 +6,7 @@ export const state = {
   version: '',
   servers: [],
   types: [],
+  update: null,
 };
 
 const subs = new Set();

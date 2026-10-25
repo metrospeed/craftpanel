@@ -17,8 +17,7 @@ export default async function network(page) {
   function render() {
     if (!net.enabled) return renderIntro();
     const addr = `${net.domain || location.hostname}${net.proxyPort !== 25565 ? ':' + net.proxyPort : ''}`;
-    const capable = net.servers.filter((s) => s.capable);
-    const joined = net.servers.filter((s) => s.joined);
+        const joined = net.servers.filter((s) => s.joined);
     mount(
       page,
       html`
@@ -118,14 +117,14 @@ export default async function network(page) {
                     </td>
                     <td class="mono small">${s.joined ? (net.forcedHosts && s.hostname ? s.hostname : '—') : `${location.hostname}:${s.port}`}</td>
                     <td class="mono small">${s.port}</td>
-                    <td>${statusBadge(s.status)}</td>
+                    <td>${statusBadge(s.status)}${s.restartPending ? html` <span class="badge starting" title="Players are online, so it wasn't restarted automatically">Restart needed</span>` : ''}</td>
                   </tr>`,
                 )}
                 ${!net.servers.length ? html`<tr><td colspan="5" class="faint" style="text-align:center;padding:24px">No servers yet. <a href="#/new">Create one</a>.</td></tr>` : ''}
               </tbody>
             </table>
           </div>
-          ${capable.some((s) => s.joined && s.status === 'running') ? html`<div class="faint small" style="padding:10px 18px">Servers that join or leave the network need a restart to pick up the new settings.</div>` : ''}
+          <div class="faint small" style="padding:10px 18px">Joining or leaving applies the settings immediately. Running servers restart automatically when nobody is online.</div>
         </div>
 
         <div class="card card-body stack">
@@ -233,7 +232,7 @@ export default async function network(page) {
       c.onchange = async () => {
         try {
           await api.patch(`/api/servers/${c.dataset.join}`, { network: c.checked });
-          toast(c.checked ? 'Added to network. Restart the server to apply.' : 'Removed from network. Restart the server to apply.');
+          toast(c.checked ? 'Added to the network. Settings applied; an empty running server restarts automatically.' : 'Removed from the network. Settings applied; an empty running server restarts automatically.');
         } catch (err) {
           toastError(err);
         }

@@ -25,6 +25,8 @@ SERVICE_USER="${CP_USER:-craftpanel}"
 SERVICE_NAME="craftpanel"
 ENV_FILE="/etc/craftpanel.env"
 UNIT_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
+UPDATE_SERVICE="/etc/systemd/system/${SERVICE_NAME}-update.service"
+UPDATE_PATH="/etc/systemd/system/${SERVICE_NAME}-update.path"
 NODE_MAJOR=22
 PANEL_PORT=""
 OPEN_FIREWALL=1
@@ -72,7 +74,8 @@ command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ] || die "syste
 if [ "$ACTION" != "install" ]; then
   info "Stopping CraftPanel (this gracefully stops all Minecraft servers)..."
   systemctl disable --now "$SERVICE_NAME" 2>/dev/null || true
-  rm -f "$UNIT_FILE" "$ENV_FILE"
+  systemctl disable --now "${SERVICE_NAME}-update.path" 2>/dev/null || true
+  rm -f "$UNIT_FILE" "$UPDATE_SERVICE" "$UPDATE_PATH" "$ENV_FILE"
   systemctl daemon-reload
   rm -rf "$INSTALL_DIR"
   if [ "$ACTION" = "purge" ]; then
@@ -118,9 +121,12 @@ fi
 
 if [ -z "$SRC_DIR" ] || [ ! -f "$SRC_DIR/package.json" ] || [ ! -d "$SRC_DIR/src" ]; then
   info "Downloading CraftPanel ($REPO@$BRANCH)..."
+  # Pin the exact commit so the panel knows which version it's running.
+  BUILD_COMMIT="$(curl -fsSL "https://api.github.com/repos/$REPO/commits/$BRANCH" 2>/dev/null | grep -m1 '"sha"' | cut -d'"' -f4 || true)"
+  ref="${BUILD_COMMIT:-refs/heads/$BRANCH}"
   src_tmp="$(mktemp -d)"
   CLEANUP+=("$src_tmp")
-  curl -fsSL "https://codeload.github.com/$REPO/tar.gz/refs/heads/$BRANCH" | tar -xz -C "$src_tmp" --strip-components=1     || die "could not download https://github.com/$REPO"
+  curl -fsSL "https://codeload.github.com/$REPO/tar.gz/$ref" | tar -xz -C "$src_tmp" --strip-components=1     || die "could not download https://github.com/$REPO"
   SRC_DIR="$src_tmp"
   [ -f "$SRC_DIR/package.json" ] || die "downloaded archive does not look like CraftPanel"
 fi
@@ -177,6 +183,10 @@ APP_DIR="$INSTALL_DIR/app"
 rm -rf "$APP_DIR.new"
 mkdir -p "$APP_DIR.new"
 cp -r "$SRC_DIR/src" "$SRC_DIR/public" "$SRC_DIR/package.json" "$APP_DIR.new/"
+if [ -z "${BUILD_COMMIT:-}" ] && command -v git >/dev/null 2>&1 && [ -d "$SRC_DIR/.git" ]; then
+  BUILD_COMMIT="$(git -C "$SRC_DIR" rev-parse HEAD 2>/dev/null || true)"
+fi
+[ -n "${BUILD_COMMIT:-}" ] && echo "$BUILD_COMMIT" > "$APP_DIR.new/BUILD_COMMIT"
 [ -f "$SRC_DIR/package-lock.json" ] && cp "$SRC_DIR/package-lock.json" "$APP_DIR.new/"
 [ -f "$SRC_DIR/README.md" ] && cp "$SRC_DIR/README.md" "$APP_DIR.new/"
 (
@@ -200,6 +210,9 @@ CP_PORT=$PANEL_PORT
 CP_HOST=0.0.0.0
 CP_DATA_DIR=$DATA_DIR
 NODE_ENV=production
+# Where the Update button looks for new versions
+CP_REPO=$REPO
+CP_BRANCH=$BRANCH
 EOF
 
 cat > "$UNIT_FILE" <<EOF
@@ -231,6 +244,31 @@ ReadWritePaths=$DATA_DIR
 WantedBy=multi-user.target
 EOF
 
+# One-click updates: the panel (unprivileged) creates update.request in its data
+# folder; this root-owned path unit notices and re-runs the installer.
+cat > "$UPDATE_SERVICE" <<EOF
+[Unit]
+Description=Update CraftPanel from GitHub
+
+[Service]
+Type=oneshot
+EnvironmentFile=$ENV_FILE
+ExecStartPre=/bin/rm -f $DATA_DIR/update.request
+ExecStart=/bin/bash -c 'curl -fsSL "https://raw.githubusercontent.com/\${CP_REPO}/\${CP_BRANCH}/install.sh" | bash > $DATA_DIR/update.log 2>&1'
+EOF
+
+cat > "$UPDATE_PATH" <<EOF
+[Unit]
+Description=Watch for CraftPanel update requests
+
+[Path]
+PathExists=$DATA_DIR/update.request
+Unit=${SERVICE_NAME}-update.service
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
 # --- firewall -----------------------------------------------------------------------
 
 if [ "$OPEN_FIREWALL" = 1 ]; then
@@ -248,6 +286,7 @@ fi
 
 systemctl daemon-reload
 systemctl enable --now "$SERVICE_NAME" >/dev/null 2>&1
+systemctl enable --now "${SERVICE_NAME}-update.path" >/dev/null 2>&1
 
 for _ in $(seq 1 20); do
   curl -fs "http://127.0.0.1:$PANEL_PORT/api/auth/state" >/dev/null 2>&1 && break

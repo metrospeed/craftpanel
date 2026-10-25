@@ -32,6 +32,16 @@ function backends() {
   return store.db.servers.filter(inNetwork);
 }
 
+/** Fingerprint of the settings a backend must be started with; a change means it needs a restart. */
+function configKey(s) {
+  return inNetwork(s) ? `net:${settings().secret}:${s.port}` : `solo:${s.port}`;
+}
+
+/** Safe for the proxy to route to: stopped (config applies on start) or running with current settings. */
+function ready(s) {
+  return !servers.isRunning(s.id) || !servers.needsRestart(s);
+}
+
 function hostnameFor(s) {
   if (s.hostname) return s.hostname;
   return settings().domain ? `${s.id}.${settings().domain}` : null;
@@ -100,6 +110,7 @@ function status() {
         hostname: hostnameFor(s),
         customHostname: s.hostname || '',
         status: servers.view(s).status,
+        restartPending: servers.needsRestart(s),
       })),
     warnings,
   };
@@ -122,8 +133,13 @@ async function enable(patch = {}) {
       isProxy: true,
       autostart: true,
     });
+  } else {
+    const proxy = proxyServer();
+    if (proxy.installState === 'installed' && !servers.isRunning(proxy.id)) {
+      servers.start(proxy.id).catch((e) => servers.log(proxy.id, `Start failed: ${e.message}`));
+    }
   }
-  await onServersChanged();
+  await syncBackends();
   return status();
 }
 
@@ -132,6 +148,7 @@ async function disable() {
   store.save();
   const proxy = proxyServer();
   if (proxy && servers.isRunning(proxy.id)) await servers.stop(proxy.id);
+  await syncBackends();
   return status();
 }
 
@@ -157,7 +174,7 @@ function update(patch = {}) {
   if ('maxPlayers' in patch) n.maxPlayers = Math.max(1, Number(patch.maxPlayers) || 500);
   if (patch.regenerateSecret) n.secret = crypto.randomBytes(24).toString('base64url');
   store.save();
-  onServersChanged().catch(() => {});
+  syncBackends().catch(() => {});
   return status();
 }
 
@@ -191,6 +208,42 @@ function onServersChanged() {
   return configuring;
 }
 
+let syncing = Promise.resolve();
+
+/**
+ * Bring every backend in line with the network settings right away instead of
+ * waiting for its next start: stopped servers get their files rewritten, and
+ * running servers that are empty restart automatically. Busy servers are left
+ * alone (the proxy skips them) until someone restarts them.
+ */
+function syncBackends() {
+  syncing = syncing.then(doSync, doSync);
+  return syncing;
+}
+
+async function doSync() {
+  for (const s of store.db.servers) {
+    if (s.isProxy || s.type === 'custom' || s.installState !== 'installed') continue;
+    const r = servers.rt(s.id);
+    const log = (l) => servers.log(s.id, l);
+    if (!r.child) {
+      await applyConfig(s, log).catch((e) => log(`Could not apply network settings: ${e.message}`));
+      continue;
+    }
+    // Starting/stopping servers are picked up on their next pass or start.
+    if (r.status !== 'running' || !servers.needsRestart(s)) continue;
+    const action = inNetwork(s) ? 'join the network' : 'apply the new network settings';
+    if (!(r.players?.online > 0)) {
+      log(`Restarting to ${action} (no players online).`);
+      servers.restart(s.id).catch((e) => log(`Restart failed: ${e.message}`));
+    } else if (r.pendingNotice !== configKey(s)) {
+      r.pendingNotice = configKey(s);
+      log(`Restart this server to ${action}. Players are online, so it was not restarted automatically.`);
+    }
+  }
+  await onServersChanged();
+}
+
 async function configureProxy() {
   const proxy = proxyServer();
   if (!proxy || proxy.installState !== 'installed') return false;
@@ -199,8 +252,8 @@ async function configureProxy() {
   const file = path.join(dir, 'velocity.toml');
   if (!fs.existsSync(file)) return false;
 
-  const list = backends();
-  const lobby = lobbyId();
+  const list = backends().filter(ready);
+  const lobby = list.some((s) => s.id === lobbyId()) ? lobbyId() : list[0]?.id || null;
   const cfg = TOML.parse(readText(file));
   cfg.bind = `0.0.0.0:${proxy.port}`;
   cfg.motd = n.motd;
@@ -317,7 +370,6 @@ async function applyConfig(server, log = () => {}) {
       disableProxyMod(server);
     }
   }
-  if (joined) log(`Network: listening on 127.0.0.1:${server.port} behind the Velocity proxy.`);
 }
 
 function env(server) {
@@ -325,4 +377,18 @@ function env(server) {
   return {};
 }
 
-module.exports = { status, enable, disable, update, firstBoot, onServersChanged, configureProxy, applyConfig, env, inNetwork, hostnameFor };
+module.exports = {
+  status,
+  enable,
+  disable,
+  update,
+  firstBoot,
+  onServersChanged,
+  syncBackends,
+  configureProxy,
+  applyConfig,
+  env,
+  inNetwork,
+  hostnameFor,
+  configKey,
+};
