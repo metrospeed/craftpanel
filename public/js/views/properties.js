@@ -1,10 +1,12 @@
 import { api } from '../api.js';
 import { html, mount, $, $$, toast, toastError } from '../ui.js';
 import { serverById } from '../state.js';
+import { motdEditor } from '../motd.js';
+import { mountIconField, iconUrl } from '../server-icon.js';
 
 // Friendly editors for the most common server.properties keys.
 const KNOWN = [
-  ['motd', 'Message of the day', 'text', 'Shown in the multiplayer server list.'],
+  ['motd', 'Message of the day (server list)', 'text'],
   ['max-players', 'Max players', 'number'],
   ['gamemode', 'Default game mode', ['survival', 'creative', 'adventure', 'spectator']],
   ['difficulty', 'Difficulty', ['peaceful', 'easy', 'normal', 'hard']],
@@ -47,6 +49,8 @@ export default async function propertiesTab(el, s) {
     if (!(key in props) && key !== 'motd') return '';
     const v = props[key] ?? '';
     const dis = locked(key) ? 'disabled' : '';
+    if (key === 'motd')
+      return html`<div class="field full"><span>${label}</span><div id="motd-editor"></div><input type="hidden" data-key="motd" value="${v}" /></div>`;
     if (type === 'bool')
       return html`<label class="check">
         <span class="switch"><input type="checkbox" data-key="${key}" ${v === 'true' ? 'checked' : ''} ${dis} /><span></span></span>
@@ -63,6 +67,7 @@ export default async function propertiesTab(el, s) {
       <form id="props" class="stack">
         <div class="card card-body">
           <h3 style="margin-bottom:14px">Gameplay</h3>
+          <div class="field" style="margin-bottom:16px"><span>Server icon</span><div id="icon-field"></div></div>
           <div class="form-grid">${KNOWN.filter((k) => k[2] !== 'bool').map(field)}</div>
           <hr />
           <div class="form-grid">${KNOWN.filter((k) => k[2] === 'bool').map(field)}</div>
@@ -89,6 +94,22 @@ export default async function propertiesTab(el, s) {
       </form>
     `,
   );
+  const motdInput = $('[data-key=motd]', el);
+  const fallbackIcon = `/img/types/${s.type === 'custom' ? 'custom.svg' : 'vanilla.svg'}`;
+  const motd = motdEditor($('#motd-editor', el), {
+    value: props.motd ?? '',
+    format: 'legacy',
+    name: s.name,
+    players: `0/${props['max-players'] || 20}`,
+    icon: iconUrl(s.id),
+    fallbackIcon,
+    onChange: (v) => (motdInput.value = v),
+  });
+  mountIconField($('#icon-field', el), s.id, {
+    fallback: fallbackIcon,
+    note: serverById(s.id)?.joinedNetwork ? 'Players joining through the network see the network icon instead (set it on the Network page).' : '',
+    onChange: (url) => motd.setIcon(url),
+  });
   $('#filter', el).oninput = (e) => {
     const q = e.target.value.toLowerCase();
     $$('[data-row]', el).forEach((r) => r.classList.toggle('hidden', !r.dataset.row.includes(q)));

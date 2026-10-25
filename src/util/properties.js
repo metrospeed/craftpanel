@@ -13,11 +13,21 @@ function parse(text) {
 }
 
 function unescape(v) {
-  return v.replace(/\\(.)/g, (_, c) => ({ n: '\n', t: '\t', r: '\r' })[c] ?? c);
+  return v.replace(/\\u([0-9a-fA-F]{4})|\\(.)/g, (_, hex, c) =>
+    hex ? String.fromCharCode(parseInt(hex, 16)) : ({ n: '\n', t: '\t', r: '\r' })[c] ?? c,
+  );
 }
 
 function escape(v) {
-  return String(v).replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/:/g, '\\:').replace(/=/g, '\\=');
+  // Non-ASCII (like the § colour sign) as \uXXXX, which every Minecraft version reads correctly.
+  return String(v)
+    .replace(/\\/g, '\\\\')
+    .replace(/\n/g, '\\n')
+    .replace(/:/g, '\\:')
+    .replace(/=/g, '\\=')
+    .replace(/[^\x20-\x7e]/g, (c) => '\\u' + c.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0'))
+    // Java drops leading spaces from values unless the first one is escaped (centred MOTDs need them).
+    .replace(/^ /, '\\ ');
 }
 
 function read(file) {

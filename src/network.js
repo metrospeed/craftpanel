@@ -170,7 +170,7 @@ function update(patch = {}) {
   }
   if ('lobby' in patch) n.lobby = patch.lobby || null;
   if ('forcedHosts' in patch) n.forcedHosts = !!patch.forcedHosts;
-  if ('motd' in patch) n.motd = String(patch.motd || '').slice(0, 300);
+  if ('motd' in patch) n.motd = String(patch.motd || '').slice(0, 1000);
   if ('maxPlayers' in patch) n.maxPlayers = Math.max(1, Number(patch.maxPlayers) || 500);
   if (patch.regenerateSecret) n.secret = crypto.randomBytes(24).toString('base64url');
   store.save();

@@ -1,6 +1,8 @@
 import { api } from '../api.js';
 import { html, mount, icon, statusBadge, typeIcon, $, $$, toast, toastError, confirmDialog, copyText } from '../ui.js';
 import { refreshServers, typeName } from '../state.js';
+import { motdEditor } from '../motd.js';
+import { mountIconField, iconUrl } from '../server-icon.js';
 
 export default async function network(page) {
   let net = null;
@@ -85,11 +87,12 @@ export default async function network(page) {
                 <input type="number" name="proxyPort" value="${net.proxyPort}" min="1" max="65535" />
               </label>
             </div>
-            <label class="field">
+            ${net.proxy ? html`<div class="field"><span>Server list icon</span><div id="icon-field"></div></div>` : ''}
+            <div class="field">
               <span>Server list MOTD</span>
-              <input type="text" name="motd" value="${net.motd}" />
-              <span class="hint">Supports MiniMessage colours, e.g. &lt;gold&gt;My Network</span>
-            </label>
+              <div id="motd-editor"></div>
+              <input type="hidden" name="motd" value="${net.motd}" />
+            </div>
             <div class="form-grid">
               <label class="field"><span>Max players shown</span><input type="number" name="maxPlayers" value="${net.maxPlayers}" min="1" /></label>
               <label class="check" style="align-self:end">
@@ -240,6 +243,18 @@ export default async function network(page) {
       };
     });
     const f = $('#net-form', page);
+    const motd = motdEditor($('#motd-editor', page), {
+      value: net.motd,
+      format: 'minimessage',
+      name: net.domain || 'CraftPanel Network',
+      players: `0/${net.maxPlayers}`,
+      icon: net.proxy ? iconUrl(net.proxy.id) : '',
+      fallbackIcon: '/img/types/velocity.svg',
+      onChange: (v) => (f.motd.value = v),
+    });
+    if (net.proxy) {
+      mountIconField($('#icon-field', page), net.proxy.id, { fallback: '/img/types/velocity.svg', onChange: (url) => motd.setIcon(url) });
+    }
     f.onsubmit = async (e) => {
       e.preventDefault();
       try {

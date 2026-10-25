@@ -1,6 +1,6 @@
 {
   "name": "craftpanel",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Self-hosted web panel for running Minecraft servers (Paper, Purpur, Folia, Fabric, Forge, NeoForge, Vanilla) behind an auto-configured Velocity proxy.",
   "main": "src/index.js",
   "type": "commonjs",

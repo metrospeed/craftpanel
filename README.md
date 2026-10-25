@@ -7,7 +7,7 @@ A self-hosted web panel for running Minecraft servers on a Linux machine, in the
 - **Mods and plugins from Modrinth**: search, install with dependencies, update, enable/disable or remove, all from the browser. Manually uploaded jars are recognised too.
 - **One domain for everything (Velocity)**: turn on the network and CraftPanel runs a Velocity proxy and keeps every config file in sync. Players join `play.example.com`, switch servers with `/server survival`, or go straight to `survival.play.example.com`.
 - **Backups**: one-click and scheduled `.tar.gz` backups (taken safely while the server runs), retention, download, and one-click restore.
-- **Live console** with colours and command history, CPU/RAM/player stats, a file manager with editor, upload (drag and drop), zip extraction, a `server.properties` editor, daily scheduled restarts, auto-restart on crash, and multiple users with per-server access.
+- **Live console** with colours and command history, CPU/RAM/player stats, a file manager with editor, upload (drag and drop), zip extraction, a `server.properties` editor with a MOTD designer (colours, bold/italic/underline, scrambled text, gradients on the network MOTD, centring and a live server-list preview), server icon upload (any image, converted to 64×64 with a cropper), daily scheduled restarts, auto-restart on crash, and multiple users with per-server access.
 
 ## Install
 
