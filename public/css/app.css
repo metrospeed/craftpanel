@@ -303,3 +303,5 @@ td.actions { text-align: right; white-space: nowrap; }
 .crop-view canvas { max-width: 100%; touch-action: none; cursor: move; }
 .crop-preview { width: 64px; height: 64px; image-rendering: pixelated; background: #0b0b0c; border: 1px solid var(--border); border-radius: 3px; }
 .crop-preview.big { width: 128px; height: 128px; }
+.server-list-card { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.server-list-card .motd-preview { width: 100%; }
