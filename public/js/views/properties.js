@@ -1,10 +1,11 @@
 import { api } from '../api.js';
 import { html, mount, $, $$, toast, toastError } from '../ui.js';
 import { serverById } from '../state.js';
+import { motdEditor } from '../motd.js';
 
 // Friendly editors for the most common server.properties keys.
 const KNOWN = [
-  ['motd', 'Message of the day', 'text', 'Shown in the multiplayer server list.'],
+  ['motd', 'Message of the day (server list)', 'text'],
   ['max-players', 'Max players', 'number'],
   ['gamemode', 'Default game mode', ['survival', 'creative', 'adventure', 'spectator']],
   ['difficulty', 'Difficulty', ['peaceful', 'easy', 'normal', 'hard']],
@@ -47,6 +48,8 @@ export default async function propertiesTab(el, s) {
     if (!(key in props) && key !== 'motd') return '';
     const v = props[key] ?? '';
     const dis = locked(key) ? 'disabled' : '';
+    if (key === 'motd')
+      return html`<div class="field full"><span>${label}</span><div id="motd-editor"></div><input type="hidden" data-key="motd" value="${v}" /></div>`;
     if (type === 'bool')
       return html`<label class="check">
         <span class="switch"><input type="checkbox" data-key="${key}" ${v === 'true' ? 'checked' : ''} ${dis} /><span></span></span>
@@ -89,6 +92,16 @@ export default async function propertiesTab(el, s) {
       </form>
     `,
   );
+  const motdInput = $('[data-key=motd]', el);
+  motdEditor($('#motd-editor', el), {
+    value: props.motd ?? '',
+    format: 'legacy',
+    name: s.name,
+    players: `0/${props['max-players'] || 20}`,
+    icon: `/api/servers/${s.id}/files/download?path=server-icon.png`,
+    fallbackIcon: `/img/types/${s.type === 'custom' ? 'custom.svg' : 'vanilla.svg'}`,
+    onChange: (v) => (motdInput.value = v),
+  });
   $('#filter', el).oninput = (e) => {
     const q = e.target.value.toLowerCase();
     $$('[data-row]', el).forEach((r) => r.classList.toggle('hidden', !r.dataset.row.includes(q)));
