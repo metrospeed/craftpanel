@@ -6,6 +6,12 @@ import { mountIconField, iconUrl } from '../server-icon.js';
 
 export default async function network(page) {
   let net = null;
+  // The settings form as last rendered, to spot unsaved edits.
+  let savedForm = null;
+  const formState = () => {
+    const f = $('#net-form', page);
+    return f ? new URLSearchParams(new FormData(f)).toString() : null;
+  };
 
   async function load() {
     try {
@@ -255,6 +261,7 @@ export default async function network(page) {
     if (net.proxy) {
       mountIconField($('#icon-field', page), net.proxy.id, { fallback: '/img/types/velocity.svg', onChange: (url) => motd.setIcon(url) });
     }
+    savedForm = formState();
     f.onsubmit = async (e) => {
       e.preventDefault();
       try {
@@ -282,10 +289,13 @@ export default async function network(page) {
   }
 
   await load();
-  // Keep status badges fresh, but don't re-render while the user is typing in the form.
+  // Keep status badges fresh, but don't re-render while the user is typing in
+  // the form or has unsaved changes in it (e.g. after clicking a MOTD colour).
   const timer = setInterval(() => {
     const active = document.activeElement;
-    if (!active || !page.contains(active) || active.tagName === 'BUTTON') load();
+    const typing = active && page.contains(active) && active.tagName !== 'BUTTON';
+    const form = formState();
+    if (!typing && (form === null || form === savedForm)) load();
   }, 5000);
   return () => clearInterval(timer);
 }
