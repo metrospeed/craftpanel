@@ -2,6 +2,7 @@ import { api } from '../api.js';
 import { html, mount, icon, statusBadge, typeIcon, $, $$, toast, toastError, confirmDialog, copyText } from '../ui.js';
 import { refreshServers, typeName } from '../state.js';
 import { motdEditor } from '../motd.js';
+import { mountIconField, iconUrl } from '../server-icon.js';
 
 export default async function network(page) {
   let net = null;
@@ -86,6 +87,7 @@ export default async function network(page) {
                 <input type="number" name="proxyPort" value="${net.proxyPort}" min="1" max="65535" />
               </label>
             </div>
+            ${net.proxy ? html`<div class="field"><span>Server list icon</span><div id="icon-field"></div></div>` : ''}
             <div class="field">
               <span>Server list MOTD</span>
               <div id="motd-editor"></div>
@@ -241,15 +243,18 @@ export default async function network(page) {
       };
     });
     const f = $('#net-form', page);
-    motdEditor($('#motd-editor', page), {
+    const motd = motdEditor($('#motd-editor', page), {
       value: net.motd,
       format: 'minimessage',
       name: net.domain || 'CraftPanel Network',
       players: `0/${net.maxPlayers}`,
-      icon: net.proxy ? `/api/servers/${net.proxy.id}/files/download?path=server-icon.png` : '',
+      icon: net.proxy ? iconUrl(net.proxy.id) : '',
       fallbackIcon: '/img/types/velocity.svg',
       onChange: (v) => (f.motd.value = v),
     });
+    if (net.proxy) {
+      mountIconField($('#icon-field', page), net.proxy.id, { fallback: '/img/types/velocity.svg', onChange: (url) => motd.setIcon(url) });
+    }
     f.onsubmit = async (e) => {
       e.preventDefault();
       try {

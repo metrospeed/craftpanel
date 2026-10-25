@@ -2,6 +2,7 @@ import { api } from '../api.js';
 import { html, mount, $, $$, toast, toastError } from '../ui.js';
 import { serverById } from '../state.js';
 import { motdEditor } from '../motd.js';
+import { mountIconField, iconUrl } from '../server-icon.js';
 
 // Friendly editors for the most common server.properties keys.
 const KNOWN = [
@@ -66,6 +67,7 @@ export default async function propertiesTab(el, s) {
       <form id="props" class="stack">
         <div class="card card-body">
           <h3 style="margin-bottom:14px">Gameplay</h3>
+          <div class="field" style="margin-bottom:16px"><span>Server icon</span><div id="icon-field"></div></div>
           <div class="form-grid">${KNOWN.filter((k) => k[2] !== 'bool').map(field)}</div>
           <hr />
           <div class="form-grid">${KNOWN.filter((k) => k[2] === 'bool').map(field)}</div>
@@ -93,14 +95,20 @@ export default async function propertiesTab(el, s) {
     `,
   );
   const motdInput = $('[data-key=motd]', el);
-  motdEditor($('#motd-editor', el), {
+  const fallbackIcon = `/img/types/${s.type === 'custom' ? 'custom.svg' : 'vanilla.svg'}`;
+  const motd = motdEditor($('#motd-editor', el), {
     value: props.motd ?? '',
     format: 'legacy',
     name: s.name,
     players: `0/${props['max-players'] || 20}`,
-    icon: `/api/servers/${s.id}/files/download?path=server-icon.png`,
-    fallbackIcon: `/img/types/${s.type === 'custom' ? 'custom.svg' : 'vanilla.svg'}`,
+    icon: iconUrl(s.id),
+    fallbackIcon,
     onChange: (v) => (motdInput.value = v),
+  });
+  mountIconField($('#icon-field', el), s.id, {
+    fallback: fallbackIcon,
+    note: serverById(s.id)?.joinedNetwork ? 'Players joining through the network see the network icon instead (set it on the Network page).' : '',
+    onChange: (url) => motd.setIcon(url),
   });
   $('#filter', el).oninput = (e) => {
     const q = e.target.value.toLowerCase();

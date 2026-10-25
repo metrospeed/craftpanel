@@ -295,3 +295,11 @@ td.actions { text-align: right; white-space: nowrap; }
 .motd-players { color: #aaa; text-shadow: 2px 2px 0 #2a2a2a; }
 .motd-line { white-space: pre; overflow: hidden; }
 .warn-text { color: var(--yellow); }
+
+/* Server icon upload and cropper */
+.icon-field { gap: 14px; }
+.server-icon-img { width: 64px; height: 64px; flex: none; image-rendering: pixelated; border-radius: 4px; background: #0b0b0c; border: 1px solid var(--border); }
+.crop-view { display: grid; place-items: center; background: repeating-conic-gradient(#1b2330 0% 25%, #151c26 0% 50%) 50% / 16px 16px; border-radius: var(--radius-sm); padding: 8px; }
+.crop-view canvas { max-width: 100%; touch-action: none; cursor: move; }
+.crop-preview { width: 64px; height: 64px; image-rendering: pixelated; background: #0b0b0c; border: 1px solid var(--border); border-radius: 3px; }
+.crop-preview.big { width: 128px; height: 128px; }

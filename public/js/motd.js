@@ -313,5 +313,12 @@ export function motdEditor(el, { value = '', format = 'legacy', name = 'Minecraf
   }, 80);
 
   update();
-  return { get value() { return fmt.toValue(ta.value); } };
+  return {
+    get value() {
+      return fmt.toValue(ta.value);
+    },
+    setIcon(url) {
+      img.src = url;
+    },
+  };
 }
