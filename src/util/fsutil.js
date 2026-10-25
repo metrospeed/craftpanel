@@ -13,6 +13,14 @@ function safeJoin(root, rel = '') {
   return target;
 }
 
+/** macOS metadata that tags along when worlds are zipped or copied on a Mac; Minecraft can choke on it. */
+function isMacJunk(rel) {
+  return String(rel)
+    .replace(/\\/g, '/')
+    .split('/')
+    .some((part) => part === '__MACOSX' || part === '.DS_Store' || part.startsWith('._'));
+}
+
 function dirSize(dir) {
   let total = 0;
   const stack = [dir];
@@ -61,4 +69,4 @@ function findFile(dir, predicate, maxDepth = 6) {
   return walk(dir, 0);
 }
 
-module.exports = { safeJoin, dirSize, findFile };
+module.exports = { safeJoin, isMacJunk, dirSize, findFile };

@@ -6,7 +6,7 @@ const path = require('path');
 const crypto = require('crypto');
 const tar = require('tar');
 const { paths } = require('./config');
-const { safeJoin } = require('./util/fsutil');
+const { safeJoin, isMacJunk } = require('./util/fsutil');
 const unzip = require('./util/unzip');
 
 // Paper, Purpur and Folia keep the Nether and End in world_nether / world_the_end.
@@ -62,14 +62,15 @@ async function prepare(files) {
         .x({
           file: archive.path,
           cwd: tmp,
-          // Plain files and folders only: no links that could point outside the server folder.
-          filter: (p, entry) => (entry.type === 'File' || entry.type === 'Directory') && !p.split('/').includes('..'),
+          // Plain files and folders only (no links that could point outside the server folder), minus macOS metadata.
+          filter: (p, entry) => (entry.type === 'File' || entry.type === 'Directory') && !p.split('/').includes('..') && !isMacJunk(p),
         })
         .catch((err) => {
           throw badRequest(`Could not read the archive: ${err.message}`);
         });
     } else {
       for (const f of files) {
+        if (isMacJunk(f.originalname)) continue;
         const target = safeJoin(tmp, f.originalname);
         fs.mkdirSync(path.dirname(target), { recursive: true });
         fs.renameSync(f.path, target);
