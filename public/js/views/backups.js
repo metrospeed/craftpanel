@@ -27,6 +27,11 @@ export default async function backupsTab(el, s) {
               ${data.busy ? html`<span class="badge starting"><span class="spinner" style="width:11px;height:11px"></span>Working…</span>` : ''}
               <button class="btn sm primary" id="create" ${data.busy ? 'disabled' : ''}>${icon('archive')}Back up now</button>
             </div>
+            ${data.copy
+              ? data.copy.problem
+                ? html`<div class="callout warn" style="margin:12px 18px 0">Backups aren't being copied right now: ${data.copy.problem} They are still kept on this machine.</div>`
+                : html`<div class="faint small" style="padding:10px 18px 0">Each backup is also copied to <span class="mono">${data.copy.path}</span>.</div>`
+              : ''}
             <div class="table-wrap">
               <table>
                 <thead><tr><th>Backup</th><th>Size</th><th>Created</th><th></th></tr></thead>
@@ -36,7 +41,10 @@ export default async function backupsTab(el, s) {
                       <tr>
                         <td>
                           <div style="font-weight:600" title="${b.name}">${date(b.createdAt)}</div>
-                          ${b.auto ? html`<span class="badge" style="margin-top:4px">scheduled</span>` : ''}
+                          <div class="row wrap" style="gap:4px;margin-top:4px">
+                            ${b.auto ? html`<span class="badge">scheduled</span>` : ''}
+                            ${data.copy ? html`${b.local ? html`<span class="badge" title="Stored on this machine">local</span>` : ''}${b.copy ? html`<span class="badge running" title="Copied to ${data.copy.path}">copy</span>` : ''}` : ''}
+                          </div>
                         </td>
                         <td class="muted small nowrap">${bytes(b.size)}</td>
                         <td class="muted small nowrap">${ago(b.createdAt)}</td>
@@ -110,7 +118,8 @@ export default async function backupsTab(el, s) {
     });
     $$('[data-delete]', el).forEach((b) => {
       b.onclick = async () => {
-        if (!(await confirmDialog({ title: 'Delete backup?', message: `Permanently delete ${b.dataset.delete}?`, confirm: 'Delete', danger: true }))) return;
+        const where = data.copy ? ' from this machine and the copy location' : '';
+        if (!(await confirmDialog({ title: 'Delete backup?', message: `Permanently delete ${b.dataset.delete}${where}?`, confirm: 'Delete', danger: true }))) return;
         await api.del(`${base}/${encodeURIComponent(b.dataset.delete)}`).catch(toastError);
         load();
       };
@@ -132,7 +141,7 @@ export default async function backupsTab(el, s) {
 
   // Refresh when a backup finishes (reported through the console log stream).
   const off = on('log', (m) => {
-    if (m.server === s.id && /^\[CraftPanel\] (Backup (complete|failed)|Restore complete)/.test(m.line)) load();
+    if (m.server === s.id && /^\[CraftPanel\] (Backup (complete|failed|copied|copy)|Restore complete)/.test(m.line)) load();
   });
   const unsub = subscribe(s.id);
   await load();

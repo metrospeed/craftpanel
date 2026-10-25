@@ -1,4 +1,6 @@
 const express = require('express');
+const path = require('path');
+const store = require('../store');
 const servers = require('../servers');
 const backups = require('../backups');
 const { requireServerAccess } = require('../auth');
@@ -9,7 +11,14 @@ router.use(requireServerAccess);
 
 router.get('/', (req, res) => {
   const s = servers.get(req.params.id);
-  res.json({ backups: backups.list(s.id), busy: backups.isBusy(s.id), schedule: s.backup });
+  const root = store.db.settings.backupCopy?.path || '';
+  const list = backups.list(s.id);
+  res.json({
+    backups: list,
+    busy: backups.isBusy(s.id),
+    schedule: s.backup,
+    copy: root ? { path: path.join(root, s.id), problem: backups.copyProblem() || list.copyError || null } : null,
+  });
 });
 
 router.post('/', (req, res) => {

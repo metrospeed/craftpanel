@@ -6,7 +6,7 @@ A self-hosted web panel for running Minecraft servers on a Linux machine, in the
 - **Automatic Java**: each server gets the Java version its Minecraft version needs (8, 17, 21 or 25). Eclipse Temurin is downloaded on demand, so you don't install Java yourself.
 - **Mods and plugins from Modrinth**: search, install with dependencies, update, enable/disable or remove, all from the browser. Manually uploaded jars are recognised too.
 - **One domain for everything (Velocity)**: turn on the network and CraftPanel runs a Velocity proxy and keeps every config file in sync. Players join `play.example.com`, switch servers with `/server survival`, or go straight to `survival.play.example.com`.
-- **Backups**: one-click and scheduled `.tar.gz` backups (taken safely while the server runs), retention, download, and one-click restore.
+- **Backups**: one-click and scheduled `.tar.gz` backups (taken safely while the server runs), retention, download, one-click restore, and an optional second copy on a NAS (local backups stay for quick restores).
 - **Live console** with colours and command history, CPU/RAM/player stats, a file manager with editor, upload (drag and drop), zip extraction, a `server.properties` editor with a MOTD designer (colours, bold/italic/underline, scrambled text, gradients on the network MOTD, centring and a live server-list preview), server icon upload (any image, converted to 64×64 with a cropper), daily scheduled restarts, auto-restart on crash, and multiple users with per-server access.
 
 ## Install
@@ -64,6 +64,19 @@ Turn on **Start at boot** for the container: CraftPanel then starts with it and 
    macOS metadata (`__MACOSX`, `._*`, `.DS_Store`) is stripped automatically from uploaded worlds and archives. When you press **Start**, CraftPanel checks the world's datapacks against the server's Minecraft version: packs made for another version can be updated (from Modrinth) or disabled with one click, since a single incompatible pack stops the server from loading the world. Disabled packs are kept in `disabled-datapacks/`.
 2. **Plugins / Mods** tab: browse Modrinth (filtered to your loader and Minecraft version) and click Install. Restart the server to load new content.
 3. **Backups** tab: back up now, or enable a schedule (e.g. every 6 hours, keep 10).
+
+### Copying backups to a NAS
+
+Backups are always kept on the CraftPanel machine for quick restores. To also keep a copy on a NAS, mount the share on the machine and set the folder in **Settings → Backup copies**. For example, with an NFS share:
+
+```bash
+sudo mkdir -p /mnt/nas
+echo 'nas.local:/volume1/minecraft /mnt/nas nfs defaults,_netdev,nofail 0 0' | sudo tee -a /etc/fstab
+sudo mount /mnt/nas
+sudo mkdir -p /mnt/nas/craftpanel && sudo chown craftpanel: /mnt/nas/craftpanel
+```
+
+Then enter `/mnt/nas/craftpanel`. Every backup is copied there after it finishes, and you can keep a longer history on the NAS than locally. If the NAS is down or not mounted, backups carry on locally and the missing copies are made on the next backup; CraftPanel refuses to copy into a folder on the local disk so an unmounted share can't silently fill it. Backups that were pruned locally can still be restored from the copy. Mount the share outside `/home`, which the CraftPanel service can't access.
 4. **Settings** tab: memory, port, autostart, daily restart time, JVM flags, and **Change version / reinstall** to update Minecraft.
 
 ### The network (one address for all servers)

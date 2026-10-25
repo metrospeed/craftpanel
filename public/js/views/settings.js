@@ -50,6 +50,7 @@ export default async function settings(page) {
                 <div><button class="btn primary" type="submit">Save</button></div>
               </form>`
             : ''}
+          ${admin ? backupCopyCard() : ''}
         </div>
 
         ${admin
@@ -112,6 +113,33 @@ export default async function settings(page) {
         toastError(err);
       }
     };
+    const bc = $('#backup-copy', page);
+    if (bc) {
+      bc.onsubmit = async (e) => {
+        e.preventDefault();
+        try {
+          const saved = await api.put('/api/settings', { backupCopy: { path: bc.copyPath.value, keep: Number(bc.copyKeep.value) || 0 } });
+          sys.settings = saved;
+          sys.backupCopyProblem = saved.backupCopyProblem;
+          if (!saved.backupCopy.path) toast('Backup copies turned off');
+          else if (saved.backupCopyProblem) toastError(`Saved, but copies can't be made yet: ${saved.backupCopyProblem}`);
+          else toast('Saved. New backups are copied there too.');
+          render();
+        } catch (err) {
+          toastError(err);
+        }
+      };
+      const sync = $('#backup-copy-sync', page);
+      if (sync)
+        sync.onclick = async () => {
+          try {
+            await api.post('/api/settings/backup-copy/sync');
+            toast('Copying existing backups. Progress is shown in each server console.');
+          } catch (err) {
+            toastError(err);
+          }
+        };
+    }
     const p = $('#panel', page);
     if (p)
       p.onsubmit = async (e) => {
@@ -131,6 +159,37 @@ export default async function settings(page) {
         load();
       };
     });
+  }
+
+  function backupCopyCard() {
+    const c = sys.settings.backupCopy || { path: '', keep: 0 };
+    return html`<form class="card card-body stack" id="backup-copy">
+      <h3>Backup copies</h3>
+      <div class="muted small">
+        Backups are always kept on this machine for quick restores. Set a folder here (for example a NAS share mounted on this
+        machine) and every backup is copied there too. If it's unavailable, backups carry on locally and the missing copies are
+        made on the next backup.
+      </div>
+      <label class="field">
+        <span>Also copy backups to</span>
+        <input type="text" name="copyPath" value="${c.path}" placeholder="/mnt/nas/craftpanel" spellcheck="false" />
+        <span class="hint">Leave empty to keep backups on this machine only. Each server gets its own subfolder. Mount the share outside /home (the CraftPanel service can't see /home) and give the craftpanel user write access.</span>
+      </label>
+      <label class="field">
+        <span>Scheduled backups to keep there</span>
+        <input type="number" name="copyKeep" value="${c.keep || ''}" min="0" max="1000" placeholder="Same as each server" />
+        <span class="hint">Can be higher than the local number, so the NAS holds a longer history. Manual backups are never pruned.</span>
+      </label>
+      ${c.path
+        ? sys.backupCopyProblem
+          ? html`<div class="callout warn">${sys.backupCopyProblem}</div>`
+          : html`<div class="callout ok">Copying backups to <span class="mono">${c.path}</span>.</div>`
+        : ''}
+      <div class="row wrap">
+        <button class="btn primary" type="submit">Save</button>
+        ${c.path && !sys.backupCopyProblem ? html`<button class="btn" type="button" id="backup-copy-sync">Copy existing backups now</button>` : ''}
+      </div>
+    </form>`;
   }
 
   function updatesCard() {

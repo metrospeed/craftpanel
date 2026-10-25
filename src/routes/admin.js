@@ -1,11 +1,13 @@
 // Network, users, panel settings and system info.
 const express = require('express');
+const path = require('path');
 const store = require('../store');
 const config = require('../config');
 const network = require('../network');
 const java = require('../java');
 const updater = require('../updater');
 const servers = require('../servers');
+const backups = require('../backups');
 const procstats = require('../util/procstats');
 const { dirSize } = require('../util/fsutil');
 const auth = require('../auth');
@@ -75,6 +77,7 @@ router.get(
   ah(async (req, res) => {
     const out = { version: config.version, system: procstats.system(), settings: store.db.settings };
     if (req.user.admin) {
+      out.backupCopyProblem = store.db.settings.backupCopy?.path ? backups.copyProblem() : null;
       out.java = await java.listRuntimes();
       out.dataDir = config.paths.data;
       out.diskUsage = { servers: dirSize(config.paths.servers), backups: dirSize(config.paths.backups) };
@@ -94,8 +97,30 @@ router.put('/settings', requireAdmin, (req, res) => {
     if (!Number.isInteger(p) || p < 1024 || p > 65000) throw servers.httpError(400, 'Invalid base port');
     store.db.settings.basePort = p;
   }
+  if ('backupCopy' in b) {
+    const dir = String(b.backupCopy?.path || '').trim().replace(/\/+$/, '');
+    const keep = Number(b.backupCopy?.keep) || 0;
+    if (dir && !path.isAbsolute(dir)) throw servers.httpError(400, 'The copy folder must be an absolute path, e.g. /mnt/nas/craftpanel');
+    if (dir && path.resolve(dir).startsWith(path.resolve(config.paths.data) + path.sep)) {
+      throw servers.httpError(400, 'The copy folder must be outside the CraftPanel data folder');
+    }
+    if (!Number.isInteger(keep) || keep < 0 || keep > 1000) throw servers.httpError(400, 'Keep must be between 0 and 1000');
+    store.db.settings.backupCopy = { path: dir, keep };
+  }
   store.save();
-  res.json(store.db.settings);
+  // Saving is allowed while the NAS is down; report the problem so the page can warn.
+  res.json({ ...store.db.settings, backupCopyProblem: store.db.settings.backupCopy?.path ? backups.copyProblem() : null });
+});
+
+// Copy existing backups of every server to the copy location now. This can
+// take a while, so it runs in the background and reports in each console.
+router.post('/settings/backup-copy/sync', requireAdmin, (req, res) => {
+  const problem = backups.copyProblem();
+  if (problem) throw servers.httpError(400, problem);
+  (async () => {
+    for (const s of store.db.servers) await backups.copyOut(s.id);
+  })();
+  res.status(202).json({ ok: true });
 });
 
 // Updates ------------------------------------------------------------------

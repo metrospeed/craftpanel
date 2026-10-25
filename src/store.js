@@ -21,6 +21,8 @@ const defaults = () => ({
   settings: {
     javaMode: 'auto', // 'auto' downloads Temurin runtimes, 'system' uses java on PATH
     basePort: 25566,
+    // Second folder every backup is copied to (e.g. a NAS mount); keep 0 = each server's own setting.
+    backupCopy: { path: '', keep: 0 },
   },
 });
 
