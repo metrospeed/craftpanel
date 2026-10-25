@@ -61,6 +61,7 @@ Turn on **Start at boot** for the container: CraftPanel then starts with it and 
 ## Using it
 
 1. **New server**: choose a type, version and memory, accept the EULA. To bring an existing world (a singleplayer save or another server's world), upload it as a `.zip`/`.tar.gz` or pick its folder under **World**; otherwise a new world is generated. The console shows the install progress, then press **Start**.
+   macOS metadata (`__MACOSX`, `._*`, `.DS_Store`) is stripped automatically from uploaded worlds and archives. When you press **Start**, CraftPanel checks the world's datapacks against the server's Minecraft version: packs made for another version can be updated (from Modrinth) or disabled with one click, since a single incompatible pack stops the server from loading the world. Disabled packs are kept in `disabled-datapacks/`.
 2. **Plugins / Mods** tab: browse Modrinth (filtered to your loader and Minecraft version) and click Install. Restart the server to load new content.
 3. **Backups** tab: back up now, or enable a schedule (e.g. every 6 hours, keep 10).
 4. **Settings** tab: memory, port, autostart, daily restart time, JVM flags, and **Change version / reinstall** to update Minecraft.

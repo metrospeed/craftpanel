@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const tar = require('tar');
 const servers = require('../servers');
-const { safeJoin } = require('../util/fsutil');
+const { safeJoin, isMacJunk } = require('../util/fsutil');
 const unzip = require('../util/unzip');
 const { requireServerAccess } = require('../auth');
 const { ah, upload } = require('./util');
@@ -58,14 +58,20 @@ router.put('/write', (req, res) => {
 router.post('/upload', upload.array('files'), (req, res) => {
   const dir = safeJoin(root(req), req.query.path || '');
   fs.mkdirSync(dir, { recursive: true });
+  let skipped = 0;
   for (const f of req.files || []) {
+    if (isMacJunk(f.originalname)) {
+      fs.rmSync(f.path, { force: true });
+      skipped++;
+      continue;
+    }
     // Browsers send folder uploads with relative paths in the original name.
     const target = safeJoin(dir, f.originalname);
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.copyFileSync(f.path, target);
     fs.rmSync(f.path, { force: true });
   }
-  res.json({ ok: true, count: (req.files || []).length });
+  res.json({ ok: true, count: (req.files || []).length - skipped, skipped });
 });
 
 router.post('/mkdir', (req, res) => {
@@ -103,7 +109,7 @@ router.post(
     if (/\.zip$/i.test(file)) {
       unzip.extract(file, dest);
     } else if (/\.(tar\.gz|tgz|tar)$/i.test(file)) {
-      await tar.x({ file, cwd: dest, filter: (p) => !p.split('/').includes('..') });
+      await tar.x({ file, cwd: dest, filter: (p) => !p.split('/').includes('..') && !isMacJunk(p) });
     } else {
       throw servers.httpError(400, 'Only .zip, .tar.gz and .tar archives can be extracted');
     }

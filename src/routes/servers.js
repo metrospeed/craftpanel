@@ -5,6 +5,7 @@ const servers = require('../servers');
 const providers = require('../providers');
 const props = require('../util/properties');
 const worlds = require('../worlds');
+const datapacks = require('../datapacks');
 const { requireAdmin, requireServerAccess, canAccess } = require('../auth');
 const { ah, folderUpload } = require('./util');
 
@@ -114,6 +115,26 @@ byId.post('/command', (req, res) => {
   servers.command(req.params.id, req.body?.command);
   res.json({ ok: true });
 });
+
+// Datapack compatibility check (run by the UI before Start) and fixes.
+byId.get(
+  '/datapacks',
+  ah(async (req, res) => {
+    const server = servers.get(req.params.id);
+    res.json(await datapacks.check(server, { failed: servers.rt(server.id).issue?.packs || [] }));
+  }),
+);
+
+byId.post('/datapacks/disable', (req, res) => {
+  res.json(datapacks.disable(servers.get(req.params.id), req.body?.name));
+});
+
+byId.post(
+  '/datapacks/update',
+  ah(async (req, res) => {
+    res.json(await datapacks.update(servers.get(req.params.id), req.body?.name, req.body?.versionId));
+  }),
+);
 
 byId.get('/logs', (req, res) => res.json(servers.rt(req.params.id).logs));
 

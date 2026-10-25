@@ -6,6 +6,7 @@ import contentTab from './content.js';
 import backupsTab from './backups.js';
 import propertiesTab from './properties.js';
 import settingsTab from './server-settings.js';
+import { startWithCheck, openDatapackDialog } from '../datapacks.js';
 
 const TABS = [
   ['console', 'terminal', 'Console'],
@@ -76,6 +77,12 @@ export default async function server(page, id, tab = 'console') {
             <button class="btn sm" data-act="restart">${icon('restart')}Restart now</button>
           </div>`
         : ''}
+      ${s.issue?.type === 'datapacks' && (st === 'stopped' || st === 'crashed')
+        ? html`<div class="callout warn row" style="flex-basis:100%">
+            <span class="grow">The server stopped because the world's datapacks failed to load${s.issue.packs.length ? html` (<b>${s.issue.packs.join(', ')}</b>)` : ''}. They were probably made for a different Minecraft version.</span>
+            <button class="btn sm primary" data-act="datapacks">${icon('puzzle')}Fix datapacks</button>
+          </div>`
+        : ''}
     `);
     if (out === lastHead) return;
     lastHead = out;
@@ -86,7 +93,15 @@ export default async function server(page, id, tab = 'console') {
         if (act === 'kill' && !(await confirmDialog({ title: 'Force kill?', message: 'The world will not be saved. Only use this if the server is frozen.', confirm: 'Kill', danger: true }))) return;
         b.disabled = true;
         try {
-          await api.post(`/api/servers/${id}/${act}`);
+          if (act === 'start') {
+            await startWithCheck(s);
+            b.disabled = false;
+          } else if (act === 'datapacks') {
+            await openDatapackDialog(s);
+            b.disabled = false;
+          } else {
+            await api.post(`/api/servers/${id}/${act}`);
+          }
         } catch (err) {
           toastError(err);
           b.disabled = false;

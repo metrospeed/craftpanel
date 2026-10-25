@@ -90,6 +90,7 @@ class ServerManager extends EventEmitter {
       joinedNetwork: require('./network').inNetwork(s),
       networkHost: require('./network').hostnameFor(s),
       restartPending: this.needsRestart(s),
+      issue: r.issue || null,
     };
   }
 
@@ -278,6 +279,9 @@ class ServerManager extends EventEmitter {
     try {
       const network = require('./network');
       await network.applyConfig(server, log);
+      r.issue = null;
+      const junk = require('./datapacks').removeJunk(server);
+      if (junk) log(`Removed ${junk} macOS metadata file(s) from the datapacks folder.`);
       r.appliedKey = network.configKey(server);
       if (network.inNetwork(server)) log(`Network: listening on 127.0.0.1:${server.port} behind the Velocity proxy.`);
       env = { ...process.env, ...network.env(server) };
@@ -290,6 +294,7 @@ class ServerManager extends EventEmitter {
 
     const args = this.buildArgs(server);
     log(`Starting with ${server.memoryMb} MB RAM: java ${args.filter((a) => !a.startsWith('-XX')).join(' ')}`);
+    r.startMarker = r.logs[r.logs.length - 1];
     const child = spawn(javaBin, args, { cwd: dir, env, stdio: ['pipe', 'pipe', 'pipe'] });
     r.child = child;
     r.stopping = false;
@@ -336,10 +341,19 @@ class ServerManager extends EventEmitter {
       clearTimeout(r.killTimer);
       const crashed = !wasStopping && code !== 0;
       log(`Server process exited (${signal || 'code ' + code}).`);
+      // Minecraft refuses to load a world whose datapacks fail; say which ones and offer a fix in the UI.
+      const startIdx = r.logs.lastIndexOf(r.startMarker);
+      const run = startIdx >= 0 ? r.logs.slice(startIdx) : r.logs;
+      if (run.some((l) => l.includes('Failed to load datapacks'))) {
+        const packs = require('./datapacks').failedFromLog(run);
+        r.issue = { type: 'datapacks', packs };
+        log(`The world's datapacks failed to load${packs.length ? `: ${packs.join(', ')}` : ''}. Use "Fix datapacks" on the server page to disable or update them.`);
+      }
       this.setStatus(id, crashed ? 'crashed' : 'stopped');
       r.exitWaiters?.forEach((fn) => fn());
       r.exitWaiters = [];
-      if (crashed && server.autoRestart && this.find(id)) this.scheduleRestart(id);
+      // Restarting can't fix broken datapacks, so don't loop on them.
+      if (crashed && server.autoRestart && !r.issue && this.find(id)) this.scheduleRestart(id);
     });
     return true;
   }

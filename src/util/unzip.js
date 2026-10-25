@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
-const { safeJoin } = require('./fsutil');
+const { safeJoin, isMacJunk } = require('./fsutil');
 
 function readEntries(fd, size) {
   const tailLen = Math.min(size, 65557);
@@ -57,26 +57,31 @@ function readEntries(fd, size) {
   return entries;
 }
 
+function readData(fd, entry) {
+  const header = Buffer.alloc(30);
+  fs.readSync(fd, header, 0, 30, entry.localOffset);
+  const dataStart = entry.localOffset + 30 + header.readUInt16LE(26) + header.readUInt16LE(28);
+  const data = Buffer.alloc(entry.compSize);
+  fs.readSync(fd, data, 0, entry.compSize, dataStart);
+  if (entry.method === 0) return data;
+  if (entry.method === 8) return zlib.inflateRawSync(data);
+  throw new Error(`Unsupported compression in ${entry.name}`);
+}
+
+/** Extract everything except macOS metadata (__MACOSX, ._*, .DS_Store). */
 function extract(zipFile, destDir) {
   const fd = fs.openSync(zipFile, 'r');
   try {
     const entries = readEntries(fd, fs.fstatSync(fd).size);
     let files = 0;
     for (const entry of entries) {
+      if (isMacJunk(entry.name)) continue;
       const target = safeJoin(destDir, entry.name);
       if (entry.name.endsWith('/')) {
         fs.mkdirSync(target, { recursive: true });
         continue;
       }
-      const header = Buffer.alloc(30);
-      fs.readSync(fd, header, 0, 30, entry.localOffset);
-      const dataStart = entry.localOffset + 30 + header.readUInt16LE(26) + header.readUInt16LE(28);
-      const data = Buffer.alloc(entry.compSize);
-      fs.readSync(fd, data, 0, entry.compSize, dataStart);
-      let out;
-      if (entry.method === 0) out = data;
-      else if (entry.method === 8) out = zlib.inflateRawSync(data);
-      else throw new Error(`Unsupported compression in ${entry.name}`);
+      const out = readData(fd, entry);
       fs.mkdirSync(path.dirname(target), { recursive: true });
       fs.writeFileSync(target, out);
       files++;
@@ -87,4 +92,15 @@ function extract(zipFile, destDir) {
   }
 }
 
-module.exports = { extract };
+/** Contents of one entry (e.g. pack.mcmeta) as a Buffer, or null if the zip doesn't have it. */
+function readEntry(zipFile, name) {
+  const fd = fs.openSync(zipFile, 'r');
+  try {
+    const entry = readEntries(fd, fs.fstatSync(fd).size).find((e) => e.name === name);
+    return entry ? readData(fd, entry) : null;
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+module.exports = { extract, readEntry };

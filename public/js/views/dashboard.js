@@ -1,6 +1,7 @@
 import { api } from '../api.js';
 import { html, mount, icon, bytes, statusBadge, typeIcon, $, $$, toastError, copyText, duration } from '../ui.js';
 import { state, onState, typeName } from '../state.js';
+import { startWithCheck } from '../datapacks.js';
 
 export default async function dashboard(page) {
   let system = null;
@@ -99,7 +100,8 @@ export default async function dashboard(page) {
       b.onclick = async () => {
         b.disabled = true;
         try {
-          await api.post(`/api/servers/${b.dataset.id}/${b.dataset.action}`);
+          if (b.dataset.action === 'start') await startWithCheck(state.servers.find((s) => s.id === b.dataset.id));
+          else await api.post(`/api/servers/${b.dataset.id}/${b.dataset.action}`);
         } catch (err) {
           toastError(err);
         }

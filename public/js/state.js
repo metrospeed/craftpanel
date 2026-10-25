@@ -49,7 +49,7 @@ on('status', ({ server, status }) => {
     s.players = null;
     s.startedAt = null;
   }
-  if (status === 'stopped') scheduleRefresh();
+  if (status === 'stopped' || status === 'crashed') scheduleRefresh();
   notify();
 });
 on('stats', ({ data }) => {
