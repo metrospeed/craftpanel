@@ -148,7 +148,8 @@ async function checkUpdates(server) {
   const { loaders, proxy } = info(server);
   const files = (await listFiles(server)).filter((f) => f.versionId);
   if (!files.length) return {};
-  const body = { hashes: files.map((f) => f.sha1), algorithm: 'sha1', loaders };
+  // Update checks and both update actions should stay on stable releases.
+  const body = { hashes: files.map((f) => f.sha1), algorithm: 'sha1', loaders, version_types: ['release'] };
   if (!proxy) body.game_versions = [server.mcVersion];
   const latest = await http.postJson(`${API}/version_files/update`, body);
   const updates = {};
