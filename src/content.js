@@ -155,7 +155,10 @@ async function checkUpdates(server) {
   const updates = {};
   for (const f of files) {
     const v = latest[f.sha1];
-    if (v && v.id !== f.versionId) updates[f.file] = { versionId: v.id, versionNumber: v.version_number };
+    if (!v || v.id === f.versionId) continue;
+    // Universal jars can have separate version IDs for different loaders.
+    if (v.files.some((file) => file.hashes?.sha1 === f.sha1)) continue;
+    updates[f.file] = { versionId: v.id, versionNumber: v.version_number };
   }
   return updates;
 }
