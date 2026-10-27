@@ -21,8 +21,9 @@ export default async function settingsTab(el, s) {
               <span class="hint">${s.joinedNetwork ? 'Internal port; players join through the proxy.' : s.isProxy ? 'Players connect to this port (25565 is the Minecraft default).' : 'Players connect to this port directly.'}</span>
             </label>
             <div class="field full">
-              <span style="font-size:12.5px;font-weight:600;color:var(--text-2)">Memory: <b style="color:var(--text)" id="mem">${(s.memoryMb / 1024).toFixed(1)} GB</b></span>
+              <span style="font-size:12.5px;font-weight:600;color:var(--text-2)">Java heap limit: <b style="color:var(--text)" id="mem">${(s.memoryMb / 1024).toFixed(1)} GB</b></span>
               <input type="range" name="memoryMb" min="512" max="32768" step="256" value="${s.memoryMb}" ${admin ? '' : 'disabled'} />
+              <span class="hint">Java also needs memory outside its heap. Leave room for JVM overhead and the operating system.</span>
             </div>
             <label class="check">
               <input type="checkbox" name="autostart" ${s.autostart ? 'checked' : ''} />

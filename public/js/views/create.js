@@ -126,12 +126,13 @@ export default async function create(page) {
                       `
                     : ''}
                   <div class="field full">
-                    <span style="font-size:12.5px;font-weight:600;color:var(--text-2)">Memory: <b style="color:var(--text)" id="mem-label">${(form.memoryMb / 1024).toFixed(1)} GB</b></span>
+                    <span style="font-size:12.5px;font-weight:600;color:var(--text-2)">Java heap limit: <b style="color:var(--text)" id="mem-label">${(form.memoryMb / 1024).toFixed(1)} GB</b></span>
                     <input type="range" name="memoryMb" min="512" max="32768" step="512" value="${form.memoryMb}" />
                     <div class="mem-presets">
                       ${MEMORY_PRESETS.map((m) => html`<button type="button" class="btn sm ${m === form.memoryMb ? 'primary' : ''}" data-mem="${m}">${m / 1024} GB</button>`)}
                     </div>
                     <span class="hint">${t.content === 'mods' ? 'Modded servers usually need 4–8 GB.' : 'Small plugin servers run well on 2–4 GB.'}</span>
+                    <span class="hint">Leave additional host memory for JVM overhead, the proxy and the operating system.</span>
                   </div>
                   ${t.network
                     ? html`<label class="check full">

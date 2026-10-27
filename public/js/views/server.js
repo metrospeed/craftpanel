@@ -211,7 +211,6 @@ async function consoleTab(el, s) {
     const cur = serverById(id);
     if (!cur) return;
     const mem = cur.stats?.memory;
-    const memPct = mem ? Math.min(100, Math.round((mem / (cur.memoryMb * 1048576)) * 100)) : 0;
     const addr = cur.isProxy
       ? `${location.hostname}:${cur.port}`
       : cur.joinedNetwork
@@ -231,9 +230,9 @@ async function consoleTab(el, s) {
           <div class="faint small" style="margin-top:4px">${cur.startedAt ? `Uptime ${duration(Date.now() - cur.startedAt)}` : 'Not running'}</div>
         </div>
         <div class="card stat">
-          <div class="label">Memory</div>
-          <div class="value">${mem ? bytes(mem) : '—'}<small> / ${bytes(cur.memoryMb * 1048576)}</small></div>
-          <div class="meter ${memPct > 92 ? 'bad' : memPct > 80 ? 'warn' : ''}"><div style="width:${memPct}%"></div></div>
+          <div class="label" title="Resident process memory includes the Java heap and JVM overhead">Process memory</div>
+          <div class="value">${mem != null ? bytes(mem) : '—'}</div>
+          <div class="faint small" style="margin-top:4px">${bytes(cur.memoryMb * 1048576)} heap limit; JVM overhead is additional</div>
         </div>
         <div class="card stat">
           <div class="label">Address</div>
