@@ -60,11 +60,24 @@ function forget(pid) {
 
 function system() {
   const cpus = os.cpus();
+  const totalMem = os.totalmem();
+  const freeMem = os.freemem();
+  // Linux uses otherwise idle RAM for reclaimable caches. MemAvailable is
+  // the estimate of what applications can use without swapping, including
+  // the container-specific figures supplied by lxcfs on Proxmox.
+  let availableMem = freeMem;
+  try {
+    const match = fs.readFileSync('/proc/meminfo', 'utf8').match(/^MemAvailable:\s+(\d+)\s+kB\s*$/m);
+    if (match) availableMem = Math.min(totalMem, Number(match[1]) * 1024);
+  } catch {
+    // Other platforms and older Linux kernels still report free memory.
+  }
   return {
     cores: cpus.length,
     load: os.loadavg(),
-    totalMem: os.totalmem(),
-    freeMem: os.freemem(),
+    totalMem,
+    freeMem,
+    availableMem,
     uptime: os.uptime(),
     platform: `${os.type()} ${os.release()}`,
     hostname: os.hostname(),

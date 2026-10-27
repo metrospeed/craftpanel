@@ -23,7 +23,8 @@ export default async function dashboard(page) {
     const proxyPlayers = proxy?.players?.online;
     const allocated = running.reduce((n, s) => n + s.memoryMb * 1048576, 0);
     const sys = system?.system;
-    const memUsed = sys ? sys.totalMem - sys.freeMem : 0;
+    const memAvailable = sys ? sys.availableMem ?? sys.freeMem : 0;
+    const memUsed = sys ? sys.totalMem - memAvailable : 0;
     const memPct = sys ? Math.round((memUsed / sys.totalMem) * 100) : 0;
     const loadPct = sys ? Math.round((sys.load[0] / sys.cores) * 100) : 0;
     const host = location.hostname;
@@ -66,10 +67,10 @@ export default async function dashboard(page) {
             <div class="value">${proxyPlayers ?? players}</div>
           </div>
           <div class="card stat">
-            <div class="label">Host memory</div>
+            <div class="label" title="Memory in use, excluding reclaimable caches when available">Host memory</div>
             <div class="value">${sys ? bytes(memUsed) : '—'}<small> / ${sys ? bytes(sys.totalMem) : '—'}</small></div>
             <div class="meter ${memPct > 90 ? 'bad' : memPct > 75 ? 'warn' : ''}"><div style="width:${memPct}%"></div></div>
-            <div class="faint small" style="margin-top:6px">${bytes(allocated)} allocated to running servers</div>
+            <div class="faint small" style="margin-top:6px">${bytes(memAvailable)} available · ${bytes(allocated)} server heap limits</div>
           </div>
           <div class="card stat">
             <div class="label">CPU load</div>
@@ -111,8 +112,6 @@ export default async function dashboard(page) {
   }
 
   function card(s) {
-    const live = s.status === 'running' || s.status === 'starting' || s.status === 'stopping';
-    const memPct = s.stats ? Math.min(100, Math.round((s.stats.memory / (s.memoryMb * 1048576)) * 100)) : 0;
     return html`
       <div class="card server-card" data-id="${s.id}">
         <div class="title">
@@ -126,10 +125,10 @@ export default async function dashboard(page) {
         <div class="meta">
           <span>Players <b>${s.players ? `${s.players.online}/${s.players.max}` : '—'}</b></span>
           <span>CPU <b>${s.stats ? s.stats.cpu + '%' : '—'}</b></span>
-          <span>RAM <b>${s.stats ? bytes(s.stats.memory) : '—'}</b> / ${bytes(s.memoryMb * 1048576)}</span>
+          <span title="Resident process memory includes the Java heap and JVM overhead">RAM <b>${s.stats ? bytes(s.stats.memory) : '—'}</b></span>
+          <span title="Maximum Java heap; total process memory can be higher">Heap limit <b>${bytes(s.memoryMb * 1048576)}</b></span>
           ${s.startedAt ? html`<span>Up <b>${duration(Date.now() - s.startedAt)}</b></span>` : ''}
         </div>
-        ${live ? html`<div class="meter ${memPct > 90 ? 'bad' : ''}" style="margin-top:-4px"><div style="width:${memPct}%"></div></div>` : ''}
         <div class="row">
           <span class="faint small grow mono">${s.joinedNetwork ? s.networkHost || 'via network' : `port ${s.port}`}</span>
           ${s.status === 'stopped' || s.status === 'crashed'

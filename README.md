@@ -49,7 +49,7 @@ Installs made before v1.1.0 don't have the updater yet: run the install command 
 CraftPanel runs well in an LXC container (tested on Proxmox VE with the Debian 13 template):
 
 1. **Create CT** from `debian-13-standard`: unprivileged, **Options → Features → Nesting** on (needed for systemd).
-2. Size it for your servers: 2 cores and 2 GB RAM for the panel plus the proxy, then add the memory you plan to give each Minecraft server (e.g. 4 GB per modded server). A 32 GB+ disk leaves room for worlds and backups.
+2. Size it for your servers: 2 cores and 2 GB RAM for the operating system, panel and proxy, then add each Minecraft server's Java heap limit (e.g. 4 GB per modded server) plus roughly 1–1.5 GB per game server for JVM overhead. The heap limit is not a cap on total process memory. A 32 GB+ disk leaves room for worlds and backups.
 3. Give it a static IP or a DHCP reservation, since your router forwards port 25565 to it.
 4. Open the container's **Console** in Proxmox, log in as root and run:
    ```bash
